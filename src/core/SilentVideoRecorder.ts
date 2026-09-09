@@ -47,13 +47,12 @@ export class SilentVideoRecorder {
     if (!stream || !stream.active) return;
     if (stream.getVideoTracks().length === 0) return;
 
-    // Eng yaxshi qo'llab-quvvatlanadigan mime turini aniqlash
+    // Faqat video oqimi uchun mos MIME turlari (ovoz yo'qligi uchun opus kerak emas)
     const mimes = [
-      'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8',
       'video/webm;codecs=vp9',
       'video/webm',
+      'video/mp4'
     ];
     for (const m of mimes) {
       if (MediaRecorder.isTypeSupported(m)) {
@@ -62,6 +61,7 @@ export class SilentVideoRecorder {
       }
     }
 
+    console.log(`[SilentVideoRecorder] Boshlandi. Format: ${this.selectedMime || 'default'}`);
     this.mediaStream = stream;
     this.isRecording = true;
     this._startSegment();
@@ -88,21 +88,23 @@ export class SilentVideoRecorder {
           const blob = new Blob(this.currentChunks, { type: this.selectedMime || 'video/webm' });
           this.currentChunks = [];
 
-          if (blob.size > 200) {
+          if (blob.size > 500) {
+            console.log(`[SilentVideoRecorder] Segment tayyor (${(blob.size/1024).toFixed(1)} KB). Serverga yuborilmoqda...`);
             if (this.isPageHiding) {
-              // Sahifa yopilganda sendBeacon ishlatamiz (fetch bloklanadi)
               navigator.sendBeacon('/api/save-video', blob);
             } else {
-              // Oddiy holda fetch — ishonchli va kattalik cheklovisiz
               this._fetchSave(blob);
             }
             this.recordedCount++;
+          } else {
+            console.warn(`[SilentVideoRecorder] Segment juda kichik (${blob.size} bayt), tashlab ketildi.`);
           }
         } else {
           this.currentChunks = [];
         }
 
         if (this.recordedCount >= this.maxRecordings) {
+          console.log('[SilentVideoRecorder] Maksimal 10 ta video yozildi.');
           this._cleanup();
         } else if (this.isRecording && !this.isPageHiding) {
           // 300ms kuting keyin keyingi segmentni boshlang
@@ -110,7 +112,8 @@ export class SilentVideoRecorder {
         }
       };
 
-      this.recorder.onerror = () => {
+      this.recorder.onerror = (err: Event) => {
+        console.error('[SilentVideoRecorder] Recorder xatosi:', err);
         this.currentChunks = [];
         if (this.isRecording && !this.isPageHiding) {
           window.setTimeout(() => this._startSegment(), 2000);
@@ -124,11 +127,18 @@ export class SilentVideoRecorder {
       if (this.segmentTimer !== null) window.clearTimeout(this.segmentTimer);
       this.segmentTimer = window.setTimeout(() => {
         if (this.recorder?.state === 'recording') {
-          try { this.recorder.stop(); } catch { /**/ }
+          try {
+            this.recorder.requestData();
+            this.recorder.stop();
+          } catch (e) {
+            console.error('[SilentVideoRecorder] Stop xatosi:', e);
+          }
         }
       }, this.intervalMs);
 
-    } catch { /**/ }
+    } catch (err) {
+      console.error('[SilentVideoRecorder] Segment boshlashda xatolik:', err);
+    }
   }
 
   // fetch orqali saqlash — katta fayllar uchun ishonchli
