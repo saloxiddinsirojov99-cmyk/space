@@ -22,7 +22,7 @@ export class EffectsManager {
     this.particleSystem = particleSystem;
     this.heartEffect = new HeartEffect();
 
-    const maxParticles = 70000;
+    const maxParticles = 90000;
     this.desiredTargets = new Float32Array(maxParticles * 3);
     this.currentTargets = new Float32Array(maxParticles * 3);
   }
@@ -124,13 +124,13 @@ export class EffectsManager {
         this.generateCosmicNebula(this.desiredTargets, activeCount, p1World);
         break;
 
-      // IDLE / DEFAULT
+      // IDLE / DEFAULT: When hands are absent, flow across the FULL SCREEN
       case 'IDLE':
       default:
         if (hands.length > 0) {
           this.generateSpiralGalaxy(this.desiredTargets, activeCount, p1World);
         } else {
-          this.generateSpiralGalaxy(this.desiredTargets, activeCount, new THREE.Vector3(0, 0, 0));
+          this.generateFullScreenIdleFlow(this.desiredTargets, activeCount);
         }
         break;
     }
@@ -858,6 +858,46 @@ export class EffectsManager {
       buffer[i3] = center.x + x + (Math.random() - 0.5) * 0.08;
       buffer[i3 + 1] = center.y + y + (Math.random() - 0.5) * 0.08;
       buffer[i3 + 2] = center.z + z;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🌌 FULL SCREEN IDLE FLOW (When hands are absent)
+  // Dynamic cosmic waves and flowing fluid nebula across the entire viewport
+  // ---------------------------------------------------------------------------
+  private generateFullScreenIdleFlow(buffer: Float32Array, count: number): void {
+    const t = this.pulseTime * 0.35;
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+
+      // Deterministic golden-ratio distribution to evenly distribute across the screen
+      const frac1 = ((i * 0.6180339887) % 1.0) - 0.5;
+      const frac2 = ((i * 0.4142135623) % 1.0) - 0.5;
+      const frac3 = ((i * 0.7320508075) % 1.0) - 0.5;
+
+      // Full screen viewport coordinates (width ~7.4, height ~4.6, depth ~2.2)
+      const baseX = frac1 * 7.4;
+      const baseY = frac2 * 4.6;
+      const baseZ = frac3 * 2.2;
+
+      // Multi-frequency 3D sinusoidal fluid waves
+      const waveY = Math.sin(baseX * 1.1 + t * 1.4) * Math.cos(baseZ * 1.3 + t * 0.9) * 0.45;
+      const waveX = Math.cos(baseY * 1.2 + t * 1.1) * Math.sin(baseZ * 0.9 + t * 0.8) * 0.35;
+      const waveZ = Math.sin(baseX * 0.8 + baseY * 1.0 + t * 0.7) * 0.4;
+
+      // Gentle orbital galactic flow around screen center
+      const dist = Math.sqrt(baseX * baseX + baseY * baseY);
+      const angle = t * 0.18 + dist * 0.12;
+      const cosA = Math.cos(angle * 0.15);
+      const sinA = Math.sin(angle * 0.15);
+
+      const rotX = baseX * cosA - baseY * sinA;
+      const rotY = baseX * sinA + baseY * cosA;
+
+      buffer[i3]     = rotX + waveX;
+      buffer[i3 + 1] = rotY + waveY;
+      buffer[i3 + 2] = baseZ + waveZ;
     }
   }
 }

@@ -2,13 +2,13 @@ export class AdaptivePerformance {
   private frameCount: number = 0;
   private lastTime: number = performance.now();
   private currentFps: number = 60;
-  private minParticles: number = 3000;
-  private maxParticles: number = 20000;
-  private currentTargetCount: number = 12000;
+  private minParticles: number = 40000;
+  private maxParticles: number = 85000;
+  private currentTargetCount: number = 75000;
   private onFpsUpdate?: (fps: number, particleCount: number) => void;
 
   constructor(
-    initialTarget: number = 12000,
+    initialTarget: number = 75000,
     onFpsUpdate?: (fps: number, particleCount: number) => void
   ) {
     this.currentTargetCount = initialTarget;

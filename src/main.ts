@@ -33,7 +33,7 @@ class Application {
     this.particleSystem = new ParticleSystem('webgl-canvas');
     this.effectsManager = new EffectsManager(this.particleSystem);
 
-    this.adaptivePerf = new AdaptivePerformance(12000, (fps, count) => {
+    this.adaptivePerf = new AdaptivePerformance(75000, (fps, count) => {
       this.hudOverlay.updateStats(fps, count);
       this.particleSystem.setActiveParticleCount(count);
     });

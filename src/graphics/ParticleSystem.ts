@@ -8,8 +8,8 @@ export class ParticleSystem {
   private pointsMesh: THREE.Points;
   private geometry: THREE.BufferGeometry;
 
-  private maxCount: number = 70000;
-  private activeCount: number = 45000;
+  private maxCount: number = 90000;
+  private activeCount: number = 75000;
 
   // Float arrays for GPU buffers
   private positions: Float32Array;
