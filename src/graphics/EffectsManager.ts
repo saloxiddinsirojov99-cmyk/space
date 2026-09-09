@@ -574,7 +574,8 @@ export class EffectsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // 🖐️ FORMATION: DENSE PARTICLE CLUSTER WITH INERTIAL HAND FLOW (STOP ✋🏻)
+  // 🖐️ FORMATION: STOP — RADIAL EXPLOSION / SHOCKWAVE BURST (STOP ✋🏻)
+  // Particles fly outward in ALL directions from hand center like a supernova
   // ---------------------------------------------------------------------------
   private generateStopDenseCluster(
     buffer: Float32Array,
@@ -583,68 +584,82 @@ export class EffectsManager {
     handVelocity: { x: number; y: number },
     dt: number
   ): void {
-    // Smoothly grow stop gesture strength
-    this.stopStrength += (1.0 - this.stopStrength) * (1.0 - Math.exp(-6.0 * dt));
+    // Smoothly grow stop strength (0→1 over ~0.5s)
+    this.stopStrength += (1.0 - this.stopStrength) * (1.0 - Math.exp(-7.0 * dt));
 
-    // Calculate World-space hand motion velocity with inertia
-    // (MediaPipe X is flipped in mirror mode, Y inverted)
-    const worldVx = -handVelocity.x * 5.5;
-    const worldVy = -handVelocity.y * 5.5;
-    const targetVel = new THREE.Vector3(worldVx, worldVy, 0);
+    // Smooth follow center
+    this.stopClusterCenter.lerp(targetCenter, 1.0 - Math.exp(-12.0 * dt));
+    const center = this.stopClusterCenter;
 
-    // Smooth inertia and damping for hand flow
-    this.stopClusterVel.lerp(targetVel, 1.0 - Math.exp(-9.0 * dt));
-    this.stopClusterCenter.lerp(targetCenter, 1.0 - Math.exp(-11.0 * dt));
-
-    // Dynamic cluster center with slight lead in velocity direction
-    const clusterPos = this.stopClusterCenter.clone().addScaledVector(this.stopClusterVel, 0.05);
-
-    // Cluster dimensions: compact, dense, orderly sphere
-    const clusterRadius = 0.38 * (1.05 - 0.22 * this.stopStrength);
+    // Explosion wave radius grows with time, then stabilizes
+    const burstRadius = 0.9 + Math.sin(this.pulseTime * 1.2) * 0.15;
+    const innerRadius = 0.08; // small dense core remains at center
     const phiGold = Math.PI * (3.0 - Math.sqrt(5.0));
 
-    const coreCount = Math.floor(count * 0.72);
-    const haloCount = count - coreCount;
+    // 3 layers:
+    //  1. Dense hot core (15%) — tight sphere at origin
+    //  2. Main shockwave shell (55%) — expanding radial burst in ALL directions
+    //  3. Outer scattered debris (30%) — particles at various distances
+    const coreCount   = Math.floor(count * 0.15);
+    const shellCount  = Math.floor(count * 0.55);
+    const debrisCount = count - coreCount - shellCount;
 
-    // 1. Dense Core Spherical Quantum Cloud
+    let idx = 0;
+
+    // ── 1. Dense Hot Core ────────────────────────────────────────────────────
     for (let i = 0; i < coreCount; i++) {
-      const i3 = i * 3;
-      const progress = i / coreCount;
+      const i3 = idx * 3;
+      const r = Math.pow(Math.random(), 1.5) * innerRadius;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
 
-      // Fibonacci sphere distribution for orderly packing
-      const y = 1.0 - progress * 2.0;
-      const radiusAtY = Math.sqrt(Math.max(0, 1.0 - y * y));
-      const theta = phiGold * i + this.pulseTime * 0.45;
-
-      // Concentric layered density (dense towards center)
-      const layerDist = Math.pow(Math.random(), 0.65) * clusterRadius;
-
-      // Velocity trailing flow: particles flow with natural fluid inertia following the hand
-      const flowLag = (1.0 - progress) * 0.12;
-      const px = clusterPos.x + Math.cos(theta) * radiusAtY * layerDist + this.stopClusterVel.x * flowLag;
-      const py = clusterPos.y + y * layerDist + this.stopClusterVel.y * flowLag;
-      const pz = clusterPos.z + Math.sin(theta) * radiusAtY * layerDist;
-
-      buffer[i3]     = px;
-      buffer[i3 + 1] = py;
-      buffer[i3 + 2] = pz;
+      buffer[i3]     = center.x + r * Math.sin(phi) * Math.cos(theta);
+      buffer[i3 + 1] = center.y + r * Math.sin(phi) * Math.sin(theta);
+      buffer[i3 + 2] = center.z + r * Math.cos(phi) * 0.6;
+      idx++;
     }
 
-    // 2. Surrounding Orderly Micro-Orbiting Shell
-    for (let i = 0; i < haloCount; i++) {
-      const i3 = (coreCount + i) * 3;
-      const progress = i / haloCount;
+    // ── 2. Main Shockwave — radial outward burst in ALL 3D directions ────────
+    for (let i = 0; i < shellCount; i++) {
+      const i3 = idx * 3;
 
-      const angle = progress * Math.PI * 16.0 + this.pulseTime * 0.6;
-      const r = clusterRadius * (1.05 + progress * 0.45);
+      // Full 3D spherical random direction
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
 
-      const px = clusterPos.x + Math.cos(angle) * r + this.stopClusterVel.x * 0.08;
-      const py = clusterPos.y + Math.sin(angle) * r * 0.85 + this.stopClusterVel.y * 0.08;
-      const pz = clusterPos.z + (Math.random() - 0.5) * 0.08;
+      // Multiple expanding rings at different radii for shockwave layers
+      const layer = Math.floor(i / (shellCount / 4)); // 0..3
+      const baseR = burstRadius * (0.55 + layer * 0.17);
+      const jitter = (Math.random() - 0.5) * 0.10;
+      const r = baseR + jitter;
 
-      buffer[i3]     = px;
-      buffer[i3 + 1] = py;
-      buffer[i3 + 2] = pz;
+      // Pulsing outward/inward oscillation per layer
+      const pulse = 1.0 + Math.sin(this.pulseTime * 2.2 + layer * 1.1) * 0.06;
+
+      buffer[i3]     = center.x + r * pulse * Math.sin(phi) * Math.cos(theta);
+      buffer[i3 + 1] = center.y + r * pulse * Math.sin(phi) * Math.sin(theta);
+      buffer[i3 + 2] = center.z + r * pulse * Math.cos(phi) * 0.7;
+      idx++;
+    }
+
+    // ── 3. Scattered Debris — particles at random distances in all directions ─
+    for (let i = 0; i < debrisCount; i++) {
+      const i3 = idx * 3;
+
+      // Fibonacci sphere for even distribution at large radius
+      const progress = i / debrisCount;
+      const y = 1.0 - progress * 2.0;
+      const radiusAtY = Math.sqrt(Math.max(0, 1.0 - y * y));
+      const theta = phiGold * i + this.pulseTime * 0.4;
+
+      // Spread from innerRadius to far edge — covers full screen if STOP held
+      const r = innerRadius + Math.pow(progress, 0.6) * burstRadius * 1.8;
+      const pulse = 1.0 + Math.sin(this.pulseTime * 1.8 + progress * Math.PI * 3) * 0.08;
+
+      buffer[i3]     = center.x + Math.cos(theta) * radiusAtY * r * pulse;
+      buffer[i3 + 1] = center.y + y * r * pulse;
+      buffer[i3 + 2] = center.z + Math.sin(theta) * radiusAtY * r * 0.55;
+      idx++;
     }
   }
 

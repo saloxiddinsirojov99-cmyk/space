@@ -121,53 +121,52 @@ export class GestureRecognizer {
       const extPinky = this.isFingerExtended(h1, 17, 20);
       const extThumb = this.isThumbExtended(h1);
 
-      // 👋🏻 WAVE: Open hand with rapid horizontal speed
-      if (extIndex && extMiddle && extRing && extPinky && speed > 0.025) {
+      const thumbIndexDist = Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y);
+      const allFourExtended = extIndex && extMiddle && extRing && extPinky;
+
+      // ✋🏻 STOP: All 5 fingers clearly extended — check FIRST before WAVE
+      // Require thumb also extended to avoid confusion with WAVE
+      if (allFourExtended && extThumb && speed <= 0.03) {
+        rawGesture = 'STOP';
+      }
+      // 👋🏻 WAVE: All 4+ fingers extended AND rapid horizontal movement
+      else if (allFourExtended && speed > 0.03) {
         rawGesture = 'WAVE';
       }
-      // 👎🏻 THUMBS DOWN: Thumb pointing down, 4 fingers curled
-      else if (h1[4].y > h1[0].y + 0.05 && !extIndex && !extMiddle && !extRing && !extPinky) {
-        rawGesture = 'THUMBS_DOWN';
-      }
-      // 🫰 BUTTERFLY (Finger Heart / Pinch / Snap 🫰):
-      // Thumb tip (4) and Index tip (8) touching or crossing, ring and pinky curled
-      const thumbIndexDist = Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y);
-      if (thumbIndexDist < 0.085 && !extRing && !extPinky) {
-        rawGesture = 'BUTTERFLY';
-      }
-      // ✊🏻 FIST: All 4 fingers curled
-      else if (!extIndex && !extMiddle && !extRing && !extPinky) {
-        rawGesture = 'FIST';
-      }
-      // 👌🏻 OK: Index tip & Thumb tip touching, Middle/Ring/Pinky extended
-      else if (thumbIndexDist < 0.075 && extMiddle && extRing) {
+      // 👌🏻 OK: Thumb & Index touching tightly, Middle+Ring extended, Pinky can be either
+      else if (thumbIndexDist < 0.07 && extMiddle && extRing) {
         rawGesture = 'OK';
       }
-      // ✌🏻 PEACE: Index & Middle extended, Ring & Pinky curled
+      // 🫰 BUTTERFLY (Finger Snap / Pinch):
+      // Thumb tip & Index tip very close, Middle NOT extended, Ring & Pinky curled
+      else if (thumbIndexDist < 0.075 && !extMiddle && !extRing && !extPinky) {
+        rawGesture = 'BUTTERFLY';
+      }
+      // ✌🏻 PEACE / 🤞🏻 CROSSED: Index & Middle extended, Ring & Pinky curled
       else if (extIndex && extMiddle && !extRing && !extPinky) {
-        // Check if fingers crossed or peace
         const crossedDist = Math.hypot(h1[8].x - h1[12].x, h1[8].y - h1[12].y);
-        if (crossedDist < 0.04) {
+        if (crossedDist < 0.042) {
           rawGesture = 'CROSSED';
         } else {
           rawGesture = 'PEACE';
         }
       }
-      // 🤞🏻 CROSSED: Index & Middle crossing
-      else if (extIndex && extMiddle && Math.hypot(h1[8].x - h1[12].x, h1[8].y - h1[12].y) < 0.045) {
-        rawGesture = 'CROSSED';
-      }
       // 🤘🏻 ROCK: Index & Pinky extended, Middle & Ring curled
       else if (extIndex && extPinky && !extMiddle && !extRing) {
         rawGesture = 'ROCK';
       }
-      // ☝🏻 ONE FINGER: Only index extended straight up
+      // ☝🏻 ONE FINGER: Only index clearly extended
       else if (extIndex && !extMiddle && !extRing && !extPinky) {
         rawGesture = 'ONE_FINGER';
       }
-      // ✋🏻 STOP: All 5 fingers extended open
-      else if (extIndex && extMiddle && extRing && extPinky && extThumb) {
-        rawGesture = 'STOP';
+      // ✊🏻 FIST: All 4 fingers curled
+      else if (!extIndex && !extMiddle && !extRing && !extPinky) {
+        // Make sure thumb is also not weirdly extended to avoid thumbs-down
+        if (h1[4].y > h1[2].y + 0.04 && h1[4].y > h1[0].y) {
+          rawGesture = 'THUMBS_DOWN';
+        } else {
+          rawGesture = 'FIST';
+        }
       }
       // 🫱🏻 RIGHT HAND: Hand orientation pointing right
       else if (h1[9].x - h1[0].x > 0.12 && Math.abs(h1[9].y - h1[0].y) < 0.1) {
