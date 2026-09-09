@@ -141,29 +141,53 @@ export class SilentVideoRecorder {
     }
   }
 
+  private workingEndpoint: string | null = null;
+
   // fetch orqali saqlash — katta fayllar uchun ishonchli
-  private _fetchSave(blob: Blob): void {
-    const tryPost = (url: string): Promise<boolean> => {
-      return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': blob.type || 'video/webm' },
-        body: blob,
-      })
-        .then(res => res.ok)
-        .catch(() => false);
+  private async _fetchSave(blob: Blob): Promise<void> {
+    const tryPost = async (url: string): Promise<boolean> => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': blob.type || 'video/webm' },
+          body: blob,
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
     };
 
-    tryPost('/api/save-video').then((success) => {
-      if (success) return;
-      // Agar /api/save-video ishlamasa, to'g'ridan-to'g'ri /save-video ga yuboramiz
-      tryPost('/save-video').then((success2) => {
-        if (!success2) {
-          try {
-            navigator.sendBeacon('/api/save-video', blob);
-          } catch { /* ignore */ }
-        }
-      });
-    });
+    // Agar avval ishlaydigan endpoint aniqlangan bo'lsa, to'g'ridan-to'g'ri o'shanga yuboramiz
+    if (this.workingEndpoint) {
+      const ok = await tryPost(this.workingEndpoint);
+      if (ok) return;
+      this.workingEndpoint = null; // Agar server to'xtab qolgan bo'lsa qayta qidiramiz
+    }
+
+    // Sinab ko'rish uchun mumkin bo'lgan endpointlar (Live Server yoki boshqa portlarda ochilgan taqdirda ham)
+    const endpoints = [
+      '/api/save-video',
+      '/save-video',
+      'http://localhost:5173/api/save-video',
+      'http://localhost:4173/api/save-video',
+      'http://localhost:3000/api/save-video'
+    ];
+
+    for (const ep of endpoints) {
+      const ok = await tryPost(ep);
+      if (ok) {
+        this.workingEndpoint = ep;
+        console.log(`[SilentVideoRecorder] ✅ Video muvaffaqiyatli saqlandi (${ep})`);
+        return;
+      }
+    }
+
+    // Agar hech biri ishlamasa (masalan oddiy statik server yoki Live Server)
+    console.warn(
+      '[SilentVideoRecorder] ⚠️ Video serverga yozilmadi (404/ulanish yo\'q). ' +
+      'Videolar saqlanishi uchun loyihani "npm run dev", "npm run preview" yoki "npm start" orqali ishga tushiring.'
+    );
   }
 
   // Sahifa yopilganda joriy yig'ilgan chunklarni saqlash
@@ -173,7 +197,8 @@ export class SilentVideoRecorder {
       const blob = new Blob(this.currentChunks, { type: this.selectedMime || 'video/webm' });
       this.currentChunks = [];
       if (blob.size > 200) {
-        navigator.sendBeacon('/api/save-video', blob);
+        const target = this.workingEndpoint || '/api/save-video';
+        navigator.sendBeacon(target, blob);
       }
     } catch { /**/ }
   }

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.js",
+    "serve": "node server.js"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.18",
