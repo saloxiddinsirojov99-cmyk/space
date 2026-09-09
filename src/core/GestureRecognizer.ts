@@ -133,13 +133,23 @@ export class GestureRecognizer {
       else if (allFourExtended && speed > 0.03) {
         rawGesture = 'WAVE';
       }
-      // 👌🏻 OK: Thumb & Index touching tightly, Middle+Ring extended, Pinky can be either
+      // ✊🏻 FIST / 👎🏻 THUMBS_DOWN: ALL 4 fingers curled — check BEFORE BUTTERFLY
+      // (Fist closes all fingers, thumb can touch index from outside → avoid BUTTERFLY)
+      else if (!extIndex && !extMiddle && !extRing && !extPinky) {
+        if (h1[4].y > h1[2].y + 0.04 && h1[4].y > h1[0].y) {
+          rawGesture = 'THUMBS_DOWN';
+        } else {
+          rawGesture = 'FIST';
+        }
+      }
+      // 👌🏻 OK: Thumb & Index touching tightly, Middle+Ring extended
       else if (thumbIndexDist < 0.07 && extMiddle && extRing) {
         rawGesture = 'OK';
       }
       // 🫰 BUTTERFLY (Finger Snap / Pinch):
-      // Thumb tip & Index tip very close, Middle NOT extended, Ring & Pinky curled
-      else if (thumbIndexDist < 0.075 && !extMiddle && !extRing && !extPinky) {
+      // Thumb tip & Index tip very close + Index IS extended (not curled like fist),
+      // Middle, Ring, Pinky curled — distinct from FIST because index extends toward thumb
+      else if (thumbIndexDist < 0.075 && extIndex && !extMiddle && !extRing && !extPinky) {
         rawGesture = 'BUTTERFLY';
       }
       // ✌🏻 PEACE / 🤞🏻 CROSSED: Index & Middle extended, Ring & Pinky curled
@@ -158,15 +168,6 @@ export class GestureRecognizer {
       // ☝🏻 ONE FINGER: Only index clearly extended
       else if (extIndex && !extMiddle && !extRing && !extPinky) {
         rawGesture = 'ONE_FINGER';
-      }
-      // ✊🏻 FIST: All 4 fingers curled
-      else if (!extIndex && !extMiddle && !extRing && !extPinky) {
-        // Make sure thumb is also not weirdly extended to avoid thumbs-down
-        if (h1[4].y > h1[2].y + 0.04 && h1[4].y > h1[0].y) {
-          rawGesture = 'THUMBS_DOWN';
-        } else {
-          rawGesture = 'FIST';
-        }
       }
       // 🫱🏻 RIGHT HAND: Hand orientation pointing right
       else if (h1[9].x - h1[0].x > 0.12 && Math.abs(h1[9].y - h1[0].y) < 0.1) {
