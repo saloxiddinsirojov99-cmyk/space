@@ -574,8 +574,8 @@ export class EffectsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // 🖐️ FORMATION: STOP — RADIAL EXPLOSION / SHOCKWAVE BURST (STOP ✋🏻)
-  // Particles fly outward in ALL directions from hand center like a supernova
+  // 🖐️ FORMATION: STOP — FULL SCREEN SCATTER (STOP ✋🏻)
+  // Pixellar butun ekranga yoyilib tarqaladi
   // ---------------------------------------------------------------------------
   private generateStopDenseCluster(
     buffer: Float32Array,
@@ -584,84 +584,62 @@ export class EffectsManager {
     handVelocity: { x: number; y: number },
     dt: number
   ): void {
-    // Smoothly grow stop strength (0→1 over ~0.5s)
     this.stopStrength += (1.0 - this.stopStrength) * (1.0 - Math.exp(-7.0 * dt));
-
-    // Smooth follow center
     this.stopClusterCenter.lerp(targetCenter, 1.0 - Math.exp(-12.0 * dt));
     const center = this.stopClusterCenter;
 
-    // Explosion wave radius grows with time, then stabilizes
-    const burstRadius = 0.9 + Math.sin(this.pulseTime * 1.2) * 0.15;
-    const innerRadius = 0.08; // small dense core remains at center
-    const phiGold = Math.PI * (3.0 - Math.sqrt(5.0));
+    // Ekran chegaralari (WebGL world units, taxminiy)
+    const screenW = 2.6;  // X: -2.6 .. +2.6
+    const screenH = 1.8;  // Y: -1.8 .. +1.8
 
-    // 3 layers:
-    //  1. Dense hot core (15%) — tight sphere at origin
-    //  2. Main shockwave shell (55%) — expanding radial burst in ALL directions
-    //  3. Outer scattered debris (30%) — particles at various distances
-    const coreCount   = Math.floor(count * 0.15);
-    const shellCount  = Math.floor(count * 0.55);
-    const debrisCount = count - coreCount - shellCount;
+    // Budget:
+    //  5% — qo'l markazida kichik yadro (qo'lda qoladi)
+    // 95% — butun ekranga yoyilib tarqaladi
+    const coreCount    = Math.floor(count * 0.05);
+    const scatterCount = count - coreCount;
 
     let idx = 0;
 
-    // ── 1. Dense Hot Core ────────────────────────────────────────────────────
+    // ── 1. Tiny core at hand position ──────────────────────────────────────
     for (let i = 0; i < coreCount; i++) {
       const i3 = idx * 3;
-      const r = Math.pow(Math.random(), 1.5) * innerRadius;
+      const r = Math.random() * 0.06;
       const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-
-      buffer[i3]     = center.x + r * Math.sin(phi) * Math.cos(theta);
-      buffer[i3 + 1] = center.y + r * Math.sin(phi) * Math.sin(theta);
-      buffer[i3 + 2] = center.z + r * Math.cos(phi) * 0.6;
+      buffer[i3]     = center.x + Math.cos(theta) * r;
+      buffer[i3 + 1] = center.y + Math.sin(theta) * r;
+      buffer[i3 + 2] = center.z;
       idx++;
     }
 
-    // ── 2. Main Shockwave — radial outward burst in ALL 3D directions ────────
-    for (let i = 0; i < shellCount; i++) {
+    // ── 2. Full screen scatter — pixellar hamma tomonga yoyiladi ────────────
+    // Sekin harakatlanuvchi "yulduzlar maydoni" effekti
+    const driftSeed = this.pulseTime * 0.18;
+
+    for (let i = 0; i < scatterCount; i++) {
       const i3 = idx * 3;
 
-      // Full 3D spherical random direction
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
+      // Deterministik lekin tabiiy ko'rinuvchi tarqalish
+      // Har bir particle o'zining seed bilan harakat qiladi
+      const seed = (i * 1.6180339887) % 1.0;
+      const seed2 = (i * 0.7548776662) % 1.0;
+      const seed3 = (i * 0.5698402910) % 1.0;
 
-      // Multiple expanding rings at different radii for shockwave layers
-      const layer = Math.floor(i / (shellCount / 4)); // 0..3
-      const baseR = burstRadius * (0.55 + layer * 0.17);
-      const jitter = (Math.random() - 0.5) * 0.10;
-      const r = baseR + jitter;
+      // Ekran bo'ylab to'liq tarqalish
+      const baseX = (seed - 0.5) * screenW * 2.0;
+      const baseY = (seed2 - 0.5) * screenH * 2.0;
+      const baseZ = (seed3 - 0.5) * 0.3;
 
-      // Pulsing outward/inward oscillation per layer
-      const pulse = 1.0 + Math.sin(this.pulseTime * 2.2 + layer * 1.1) * 0.06;
+      // Juda sekin organik drift (sust to'lqinlanish)
+      const driftX = Math.sin(driftSeed * 0.7 + seed * Math.PI * 7.3) * 0.12;
+      const driftY = Math.cos(driftSeed * 0.5 + seed2 * Math.PI * 5.1) * 0.09;
 
-      buffer[i3]     = center.x + r * pulse * Math.sin(phi) * Math.cos(theta);
-      buffer[i3 + 1] = center.y + r * pulse * Math.sin(phi) * Math.sin(theta);
-      buffer[i3 + 2] = center.z + r * pulse * Math.cos(phi) * 0.7;
-      idx++;
-    }
-
-    // ── 3. Scattered Debris — particles at random distances in all directions ─
-    for (let i = 0; i < debrisCount; i++) {
-      const i3 = idx * 3;
-
-      // Fibonacci sphere for even distribution at large radius
-      const progress = i / debrisCount;
-      const y = 1.0 - progress * 2.0;
-      const radiusAtY = Math.sqrt(Math.max(0, 1.0 - y * y));
-      const theta = phiGold * i + this.pulseTime * 0.4;
-
-      // Spread from innerRadius to far edge — covers full screen if STOP held
-      const r = innerRadius + Math.pow(progress, 0.6) * burstRadius * 1.8;
-      const pulse = 1.0 + Math.sin(this.pulseTime * 1.8 + progress * Math.PI * 3) * 0.08;
-
-      buffer[i3]     = center.x + Math.cos(theta) * radiusAtY * r * pulse;
-      buffer[i3 + 1] = center.y + y * r * pulse;
-      buffer[i3 + 2] = center.z + Math.sin(theta) * radiusAtY * r * 0.55;
+      buffer[i3]     = baseX + driftX;
+      buffer[i3 + 1] = baseY + driftY;
+      buffer[i3 + 2] = baseZ;
       idx++;
     }
   }
+
 
   // ---------------------------------------------------------------------------
   // 🫰 FORMATION: LIVING BUTTERFLY WITH FLAPPING WINGS & TRAILING (BUTTERFLY 🫰)
