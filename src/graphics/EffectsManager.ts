@@ -21,6 +21,16 @@ export class EffectsManager {
   // Precomputed rasterized 2D points for CHAROS text formation
   private charosPoints: { x: number; y: number }[] = [];
 
+  // 🖐️ STOP Dense Cluster State (Inertia & Motion Flow)
+  private stopClusterCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private stopClusterVel: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private stopStrength: number = 0;
+
+  // 🫰 BUTTERFLY State (Living Flap, Inertia, Follow & Trailing)
+  private butterflyCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private butterflyVelocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private butterflyTilt: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+
   constructor(particleSystem: ParticleSystem) {
     this.particleSystem = particleSystem;
     this.heartEffect = new HeartEffect();
@@ -47,6 +57,8 @@ export class EffectsManager {
 
       if (!this.isHandPresent) {
         this.smoothedHandCenter.copy(p1World);
+        this.stopClusterCenter.copy(p1World);
+        this.butterflyCenter.copy(p1World);
         this.isHandPresent = true;
       } else {
         this.targetHandCenter.copy(p1World);
@@ -88,12 +100,17 @@ export class EffectsManager {
         this.generateSpiralGalaxy(this.desiredTargets, activeCount, p1World);
         break;
 
-      // 💥 4. FULL SCREEN DISPERSION & SCATTER (STOP ✋🏻)
+      // 🖐️ 4. DENSE PARTICLE CLUSTER & INERTIAL HAND FLOW (STOP ✋🏻)
       case 'STOP':
-        this.generateScreenDispersion(this.desiredTargets, activeCount, p1World);
+        this.generateStopDenseCluster(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
         break;
 
-      // 🪐 5. RINGED PLANET / SATURN (Pinch / OK 👌🏻)
+      // 🫰 5. LIVING BUTTERFLY WITH FLAPPING WINGS & TRAILING (BUTTERFLY 🫰)
+      case 'BUTTERFLY':
+        this.generateButterflyEffect(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
+        break;
+
+      // 🪐 6. RINGED PLANET / SATURN (Pinch / OK 👌🏻)
       case 'OK':
         this.generateRingedPlanet(this.desiredTargets, activeCount, p1World);
         break;
@@ -557,28 +574,223 @@ export class EffectsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // 💥 FORMATION: FULL SCREEN PARTICLE DISPERSION & SCATTER (STOP ✋🏻)
+  // 🖐️ FORMATION: DENSE PARTICLE CLUSTER WITH INERTIAL HAND FLOW (STOP ✋🏻)
   // ---------------------------------------------------------------------------
-  private generateScreenDispersion(buffer: Float32Array, count: number, center: THREE.Vector3): void {
-    for (let i = 0; i < count; i++) {
+  private generateStopDenseCluster(
+    buffer: Float32Array,
+    count: number,
+    targetCenter: THREE.Vector3,
+    handVelocity: { x: number; y: number },
+    dt: number
+  ): void {
+    // Smoothly grow stop gesture strength
+    this.stopStrength += (1.0 - this.stopStrength) * (1.0 - Math.exp(-6.0 * dt));
+
+    // Calculate World-space hand motion velocity with inertia
+    // (MediaPipe X is flipped in mirror mode, Y inverted)
+    const worldVx = -handVelocity.x * 5.5;
+    const worldVy = -handVelocity.y * 5.5;
+    const targetVel = new THREE.Vector3(worldVx, worldVy, 0);
+
+    // Smooth inertia and damping for hand flow
+    this.stopClusterVel.lerp(targetVel, 1.0 - Math.exp(-9.0 * dt));
+    this.stopClusterCenter.lerp(targetCenter, 1.0 - Math.exp(-11.0 * dt));
+
+    // Dynamic cluster center with slight lead in velocity direction
+    const clusterPos = this.stopClusterCenter.clone().addScaledVector(this.stopClusterVel, 0.05);
+
+    // Cluster dimensions: compact, dense, orderly sphere
+    const clusterRadius = 0.38 * (1.05 - 0.22 * this.stopStrength);
+    const phiGold = Math.PI * (3.0 - Math.sqrt(5.0));
+
+    const coreCount = Math.floor(count * 0.72);
+    const haloCount = count - coreCount;
+
+    // 1. Dense Core Spherical Quantum Cloud
+    for (let i = 0; i < coreCount; i++) {
       const i3 = i * 3;
+      const progress = i / coreCount;
 
-      // Radial and expansive wave dispersion across the entire screen
-      const progress = i / count;
-      const angle = progress * Math.PI * 36.0 + this.pulseTime * 0.5;
-      const elevation = Math.sin(i * 12.9898) * 1.8;
+      // Fibonacci sphere distribution for orderly packing
+      const y = 1.0 - progress * 2.0;
+      const radiusAtY = Math.sqrt(Math.max(0, 1.0 - y * y));
+      const theta = phiGold * i + this.pulseTime * 0.45;
 
-      // Wide field of view: X [-3.6 .. 3.6], Y [-2.5 .. 2.5]
-      const spreadR = 0.4 + Math.pow(Math.random(), 0.55) * 3.4;
-      const wave = Math.sin(this.pulseTime * 2.8 + spreadR * 4.0) * 0.2;
+      // Concentric layered density (dense towards center)
+      const layerDist = Math.pow(Math.random(), 0.65) * clusterRadius;
 
-      const sx = center.x + Math.cos(angle) * (spreadR + wave) * 1.35;
-      const sy = center.y + Math.sin(angle) * (spreadR + wave) * 0.95 + elevation * 0.35;
-      const sz = center.z + (Math.random() - 0.5) * 2.0;
+      // Velocity trailing flow: particles flow with natural fluid inertia following the hand
+      const flowLag = (1.0 - progress) * 0.12;
+      const px = clusterPos.x + Math.cos(theta) * radiusAtY * layerDist + this.stopClusterVel.x * flowLag;
+      const py = clusterPos.y + y * layerDist + this.stopClusterVel.y * flowLag;
+      const pz = clusterPos.z + Math.sin(theta) * radiusAtY * layerDist;
 
-      buffer[i3]     = sx;
-      buffer[i3 + 1] = sy;
-      buffer[i3 + 2] = sz;
+      buffer[i3]     = px;
+      buffer[i3 + 1] = py;
+      buffer[i3 + 2] = pz;
+    }
+
+    // 2. Surrounding Orderly Micro-Orbiting Shell
+    for (let i = 0; i < haloCount; i++) {
+      const i3 = (coreCount + i) * 3;
+      const progress = i / haloCount;
+
+      const angle = progress * Math.PI * 16.0 + this.pulseTime * 0.6;
+      const r = clusterRadius * (1.05 + progress * 0.45);
+
+      const px = clusterPos.x + Math.cos(angle) * r + this.stopClusterVel.x * 0.08;
+      const py = clusterPos.y + Math.sin(angle) * r * 0.85 + this.stopClusterVel.y * 0.08;
+      const pz = clusterPos.z + (Math.random() - 0.5) * 0.08;
+
+      buffer[i3]     = px;
+      buffer[i3 + 1] = py;
+      buffer[i3 + 2] = pz;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🫰 FORMATION: LIVING BUTTERFLY WITH FLAPPING WINGS & TRAILING (BUTTERFLY 🫰)
+  // ---------------------------------------------------------------------------
+  private generateButterflyEffect(
+    buffer: Float32Array,
+    count: number,
+    targetCenter: THREE.Vector3,
+    handVelocity: { x: number; y: number },
+    dt: number
+  ): void {
+    // 1. Smooth Hand Follow with Inertia
+    const worldVx = -handVelocity.x * 6.5;
+    const worldVy = -handVelocity.y * 6.5;
+    const targetVel = new THREE.Vector3(worldVx, worldVy, 0);
+
+    this.butterflyVelocity.lerp(targetVel, 1.0 - Math.exp(-9.0 * dt));
+    this.butterflyCenter.lerp(targetCenter, 1.0 - Math.exp(-11.0 * dt));
+
+    const speed = Math.hypot(this.butterflyVelocity.x, this.butterflyVelocity.y);
+
+    // Natural banking tilt during hand motion (roll and pitch)
+    const targetTiltZ = -this.butterflyVelocity.x * 0.35;
+    const targetTiltX = this.butterflyVelocity.y * 0.25;
+    this.butterflyTilt.lerp(new THREE.Vector3(targetTiltX, 0, targetTiltZ), 1.0 - Math.exp(-8.0 * dt));
+
+    const cosZ = Math.cos(this.butterflyTilt.z), sinZ = Math.sin(this.butterflyTilt.z);
+    const cosX = Math.cos(this.butterflyTilt.x), sinX = Math.sin(this.butterflyTilt.x);
+
+    // Dynamic living wing flap (faster when moving)
+    const flapSpeed = 4.2 + Math.min(speed * 3.5, 4.0);
+    const flapPhase = Math.sin(this.pulseTime * flapSpeed);
+    const flapAmount = 0.55;
+
+    // Butterfly Scale (optimal scale relative to hand)
+    const bScale = 0.85;
+
+    // Partition particles:
+    // Body & Antennae: 12%
+    // Forewings (Top Wings): 44%
+    // Hindwings (Bottom Wings): 32%
+    // Motion Trailing Stardust: 12%
+    const bodyPool = Math.floor(count * 0.12);
+    const forewingPool = Math.floor(count * 0.44);
+    const hindwingPool = Math.floor(count * 0.32);
+    const trailPool = count - bodyPool - forewingPool - hindwingPool;
+
+    let idx = 0;
+
+    // Helper: 3D rotation & positioning for butterfly elements
+    const placeParticle = (lx: number, ly: number, lz: number) => {
+      // 3D rotation with banking tilt
+      const y1 = ly * cosX - lz * sinX;
+      const z1 = ly * sinX + lz * cosX;
+
+      const x2 = lx * cosZ - y1 * sinZ;
+      const y2 = lx * sinZ + y1 * cosZ;
+
+      const i3 = idx * 3;
+      buffer[i3]     = this.butterflyCenter.x + x2;
+      buffer[i3 + 1] = this.butterflyCenter.y + y2;
+      buffer[i3 + 2] = this.butterflyCenter.z + z1;
+      idx++;
+    };
+
+    // --- 1. BUTTERFLY BODY & ANTENNAE ---
+    const antennaeCount = Math.floor(bodyPool * 0.35);
+    const coreBodyCount = bodyPool - antennaeCount;
+
+    // Torso and abdomen
+    for (let i = 0; i < coreBodyCount; i++) {
+      const p = i / coreBodyCount;
+      const by = (p - 0.5) * (0.65 * bScale);
+      const bRad = (1.0 - Math.abs(p - 0.5) * 1.6) * (0.045 * bScale) + 0.01;
+      const angle = Math.random() * Math.PI * 2;
+
+      const bx = Math.cos(angle) * bRad;
+      const bz = Math.sin(angle) * bRad;
+      placeParticle(bx, by, bz);
+    }
+
+    // Curved Antennae
+    const perAntenna = Math.floor(antennaeCount / 2);
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 0; i < perAntenna; i++) {
+        const p = i / perAntenna;
+        const ax = side * (0.02 + Math.pow(p, 1.4) * 0.18) * bScale;
+        const ay = (0.28 + p * 0.28) * bScale;
+        const az = Math.sin(p * Math.PI) * 0.04 * bScale;
+        placeParticle(ax, ay, az);
+      }
+    }
+
+    // --- 2. FOREWINGS (Large Top Wings) ---
+    for (let i = 0; i < forewingPool; i++) {
+      const side = (i % 2 === 0) ? 1 : -1;
+      const u = Math.random(); // radial progress
+      const v = Math.random() * Math.PI * 0.5; // angle in quadrant
+
+      // Organic curved top wing profile
+      const wingRadius = Math.sin(v) * (0.75 * bScale) * (0.4 + 0.6 * Math.sqrt(u));
+      const wx = side * (0.04 + Math.cos(v) * wingRadius);
+      const wy = (0.05 + Math.sin(v) * wingRadius * 0.85);
+
+      // Flapping Z displacement based on distance from spine
+      const wingSpanNorm = Math.abs(wx) / (0.85 * bScale);
+      const wz = flapPhase * Math.pow(wingSpanNorm, 1.1) * (flapAmount * bScale);
+
+      // Wing contraction during flap
+      const compressedX = wx * (1.0 - 0.14 * flapPhase * flapPhase);
+
+      placeParticle(compressedX, wy, wz);
+    }
+
+    // --- 3. HINDWINGS (Rounded Bottom Wings) ---
+    for (let i = 0; i < hindwingPool; i++) {
+      const side = (i % 2 === 0) ? 1 : -1;
+      const u = Math.random();
+      const v = Math.random() * Math.PI * 0.55;
+
+      // Rounded teardrop bottom wing profile
+      const wingRadius = Math.sin(v) * (0.55 * bScale) * (0.35 + 0.65 * Math.sqrt(u));
+      const wx = side * (0.035 + Math.cos(v) * wingRadius * 0.85);
+      const wy = (-0.05 - Math.sin(v) * wingRadius * 0.7);
+
+      const wingSpanNorm = Math.abs(wx) / (0.6 * bScale);
+      const wz = flapPhase * Math.pow(wingSpanNorm, 1.1) * (flapAmount * 0.8 * bScale);
+      const compressedX = wx * (1.0 - 0.12 * flapPhase * flapPhase);
+
+      placeParticle(compressedX, wy, wz);
+    }
+
+    // --- 4. TRAILING STARDUST STREAM (Active with hand velocity) ---
+    for (; idx < count; idx++) {
+      const p = (idx - (count - trailPool)) / trailPool;
+
+      // Particles flow backward along the negative velocity vector
+      const trailSpread = (0.05 + p * 0.25) * bScale;
+
+      const tx = (Math.random() - 0.5) * trailSpread - this.butterflyVelocity.x * (p * 0.25);
+      const ty = (Math.random() - 0.5) * trailSpread - this.butterflyVelocity.y * (p * 0.25);
+      const tz = (Math.random() - 0.5) * 0.12;
+
+      placeParticle(tx, ty, tz);
     }
   }
 

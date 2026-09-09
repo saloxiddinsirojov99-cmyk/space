@@ -14,6 +14,7 @@ export type GestureType =
   | 'OK'
   | 'ONE_FINGER'
   | 'STOP'
+  | 'BUTTERFLY'
   | 'WAVE'
   | 'RIGHT_HAND'
   | 'LEFT_HAND'
@@ -128,12 +129,18 @@ export class GestureRecognizer {
       else if (h1[4].y > h1[0].y + 0.05 && !extIndex && !extMiddle && !extRing && !extPinky) {
         rawGesture = 'THUMBS_DOWN';
       }
+      // 🫰 BUTTERFLY (Finger Heart / Pinch / Snap 🫰):
+      // Thumb tip (4) and Index tip (8) touching or crossing, ring and pinky curled
+      const thumbIndexDist = Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y);
+      if (thumbIndexDist < 0.085 && !extRing && !extPinky) {
+        rawGesture = 'BUTTERFLY';
+      }
       // ✊🏻 FIST: All 4 fingers curled
       else if (!extIndex && !extMiddle && !extRing && !extPinky) {
         rawGesture = 'FIST';
       }
       // 👌🏻 OK: Index tip & Thumb tip touching, Middle/Ring/Pinky extended
-      else if (Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y) < 0.075 && extMiddle && extRing) {
+      else if (thumbIndexDist < 0.075 && extMiddle && extRing) {
         rawGesture = 'OK';
       }
       // ✌🏻 PEACE: Index & Middle extended, Ring & Pinky curled

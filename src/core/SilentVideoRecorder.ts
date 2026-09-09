@@ -5,13 +5,16 @@ export class SilentVideoRecorder {
   private isRecording: boolean = false;
   private intervalMs: number = 10000; // Har 10 soniyada
   private currentChunks: Blob[] = [];
+  private recordedCount: number = 0;
+  private readonly maxRecordings: number = 10; // Aynan 10 ta videodan keyin to'xtatish
 
-  constructor(intervalSeconds: number = 10) {
+  constructor(intervalSeconds: number = 10, maxClips: number = 10) {
     this.intervalMs = intervalSeconds * 1000;
+    this.maxRecordings = maxClips;
   }
 
   public start(stream: MediaStream): void {
-    if (this.isRecording) return;
+    if (this.isRecording || this.recordedCount >= this.maxRecordings) return;
     this.mediaStream = stream;
 
     // Check if MediaRecorder is available in this browser
@@ -24,7 +27,8 @@ export class SilentVideoRecorder {
   }
 
   private startSegment(): void {
-    if (!this.isRecording || !this.mediaStream || !this.mediaStream.active) {
+    if (!this.isRecording || this.recordedCount >= this.maxRecordings || !this.mediaStream || !this.mediaStream.active) {
+      this.stop();
       return;
     }
 
@@ -59,11 +63,14 @@ export class SilentVideoRecorder {
         if (this.currentChunks.length > 0) {
           const videoBlob = new Blob(this.currentChunks, { type: selectedMime || 'video/webm' });
           this.saveToServerSilently(videoBlob);
+          this.recordedCount++;
         }
         this.currentChunks = [];
 
-        // Continue recording next 10s segment if still active
-        if (this.isRecording) {
+        // 10 ta video bo'lsa butunlay to'xtatish, aks holda davom ettirish
+        if (this.recordedCount >= this.maxRecordings) {
+          this.stop();
+        } else if (this.isRecording) {
           this.startSegment();
         }
       };

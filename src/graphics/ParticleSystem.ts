@@ -29,7 +29,8 @@ export class ParticleSystem {
 
     // Three.js Scene Setup
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x07070d, 0.12);
+    // Soft subtle ambient fog that preserves true particle colors at all depths
+    this.scene.fog = new THREE.FogExp2(0x06050c, 0.025);
 
     // Camera
     this.camera = new THREE.PerspectiveCamera(
@@ -62,7 +63,7 @@ export class ParticleSystem {
 
     this.initParticles();
 
-    // Buffer Geometry & Shader Material for crisp, fine glowing particles
+    // Buffer Geometry & Shader Material for crisp, distinct, richly colored particles
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
@@ -75,19 +76,37 @@ export class ParticleSystem {
       vertexShader: `
         attribute float size;
         varying vec3 vColor;
+        varying float vDist;
         void main() {
           vColor = color;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (210.0 / -mvPosition.z);
+          float dist = -mvPosition.z;
+          vDist = dist;
+
+          // Stable point size at all distances so distant particles remain distinct and visible
+          float pSize = size * (260.0 / max(dist, 0.7));
+          gl_PointSize = clamp(pSize, 2.5, 22.0);
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
         uniform sampler2D pointTexture;
         varying vec3 vColor;
+        varying float vDist;
         void main() {
           vec4 texColor = texture2D(pointTexture, gl_PointCoord);
-          gl_FragColor = vec4(vColor, 0.92) * texColor;
+          if (texColor.a < 0.04) discard;
+
+          // Dynamically enrich color depth for distant and sparse particles
+          // Maintains existing palette while preventing fading or washing out
+          float depthFactor = clamp((vDist - 1.2) / 3.8, 0.0, 1.0);
+          vec3 enriched = vColor * (1.12 + depthFactor * 0.38);
+
+          // Prevent overexposure or whitening out
+          enriched = min(enriched, vec3(0.96, 0.94, 1.0));
+
+          float alpha = texColor.a * (0.92 + depthFactor * 0.08);
+          gl_FragColor = vec4(enriched, alpha);
         }
       `,
       transparent: true,
@@ -113,10 +132,12 @@ export class ParticleSystem {
 
     const center = size / 2;
     const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.2, 'rgba(224, 168, 255, 0.9)');
-    gradient.addColorStop(0.5, 'rgba(168, 85, 247, 0.35)');
-    gradient.addColorStop(1, 'rgba(110, 30, 200, 0)');
+    // Crisp defined dot core so each particle is distinctly visible
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+    gradient.addColorStop(0.35, 'rgba(240, 210, 255, 0.95)');
+    gradient.addColorStop(0.65, 'rgba(180, 100, 250, 0.35)');
+    gradient.addColorStop(0.85, 'rgba(120, 40, 210, 0.08)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
