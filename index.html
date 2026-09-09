@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Hand Tracking Particle Universe - Real-Time Interaktiv Web Loyiha</title>
+    <meta name="description" content="Real-time hand tracking and glowing purple particle interactive web experience using MediaPipe and Three.js WebGL physics." />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Main 3D Canvas Background -->
+    <div id="app-container">
+      <canvas id="webgl-canvas"></canvas>
+
+      <!-- Video element for hand tracking (hidden by default or shown in PIP) -->
+      <video id="webcam-video" playsinline muted autoplay></video>
+
+      <!-- PIP Mini Video Container -->
+      <div id="pip-container" class="pip-hidden">
+        <canvas id="pip-canvas"></canvas>
+        <span class="pip-label">LIVE FEED</span>
+      </div>
+
+      <!-- HUD UI Overlay -->
+      <div id="hud-overlay" class="hud-container">
+        <!-- Header / Brand -->
+        <header class="hud-header">
+          <div class="brand">
+            <div class="brand-glow-dot"></div>
+            <h1>NEBULA<span>HANDS</span></h1>
+          </div>
+          <div class="status-badges">
+            <div id="status-camera" class="badge badge-offline">
+              <span class="badge-dot"></span>
+              <span class="badge-text">Camera: OFF</span>
+            </div>
+            <div id="status-fps" class="badge badge-neutral">
+              <span class="badge-text">-- FPS</span>
+            </div>
+            <div id="status-particles" class="badge badge-neutral hidden-mobile">
+              <span class="badge-text">0 Pts</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Center Instruction / Active Gesture Display -->
+        <main class="hud-center">
+          <div id="gesture-card" class="gesture-card gesture-idle">
+            <div id="gesture-emoji" class="gesture-emoji">✨</div>
+            <div class="gesture-info">
+              <div id="gesture-name" class="gesture-name">Show your hands</div>
+              <div id="gesture-subtext" class="gesture-subtext">Move your hand in front of the camera</div>
+            </div>
+          </div>
+        </main>
+
+        <!-- Bottom Controls & Gesture Bar -->
+        <footer class="hud-footer">
+          <!-- Horizontal scrollable gesture reference icons -->
+          <div class="gesture-bar-wrapper">
+            <div class="gesture-bar" id="gesture-bar">
+              <button class="gesture-chip" data-gesture="LOVE"><span class="chip-icon">🫶🏻</span> LOVE</button>
+              <button class="gesture-chip" data-gesture="PEACE"><span class="chip-icon">✌🏻</span> PEACE</button>
+              <button class="gesture-chip" data-gesture="OK"><span class="chip-icon">👌🏻</span> OK</button>
+              <button class="gesture-chip" data-gesture="FIST"><span class="chip-icon">✊🏻</span> FIST</button>
+              <button class="gesture-chip" data-gesture="STOP"><span class="chip-icon">✋🏻</span> STOP</button>
+              <button class="gesture-chip" data-gesture="ONE_FINGER"><span class="chip-icon">☝🏻</span> ONE FINGER</button>
+              <button class="gesture-chip" data-gesture="ROCK"><span class="chip-icon">🤘🏻</span> ROCK</button>
+              <button class="gesture-chip" data-gesture="CROSSED"><span class="chip-icon">🤞🏻</span> CROSSED</button>
+              <button class="gesture-chip" data-gesture="THUMBS_DOWN"><span class="chip-icon">👎🏻</span> THUMBS DOWN</button>
+              <button class="gesture-chip" data-gesture="OPEN_PALMS"><span class="chip-icon">🤲🏻</span> OPEN PALMS</button>
+              <button class="gesture-chip" data-gesture="HANDS_UP"><span class="chip-icon">🙌🏻</span> HANDS UP</button>
+              <button class="gesture-chip" data-gesture="WAVE"><span class="chip-icon">👋🏻</span> WAVE</button>
+              <button class="gesture-chip" data-gesture="HANDSHAKE"><span class="chip-icon">🤝</span> HANDSHAKE</button>
+              <button class="gesture-chip" data-gesture="RIGHT_HAND"><span class="chip-icon">🫱🏻</span> RIGHT</button>
+              <button class="gesture-chip" data-gesture="LEFT_HAND"><span class="chip-icon">🫲🏻</span> LEFT</button>
+            </div>
+          </div>
+
+          <!-- Bottom Actions -->
+          <div class="action-buttons">
+            <button id="btn-toggle-pip" class="btn-action" title="Kamera oynasini almashtirish">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span>Camera Feed</span>
+            </button>
+            <button id="btn-toggle-fullscreen" class="btn-action" title="To'liq ekran">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+          </div>
+        </footer>
+      </div>
+
+      <!-- Fallback Modal Screen (Camera Request / Denied) -->
+      <div id="fallback-screen" class="fallback-overlay hidden">
+        <div class="fallback-card">
+          <div class="fallback-icon-wrapper">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </div>
+          <h2 id="fallback-title">Kameraga ruxsat berilmadi</h2>
+          <p id="fallback-message">Ushbu interaktiv loyiha real vaqt rejimida qo'lingiz harakatlarini aniqlash va binafsha particle animatsiyalarini yaratish uchun kameradan foydalanadi.</p>
+          <div id="fallback-instructions" class="fallback-instructions hidden"></div>
+          <div class="fallback-actions">
+            <button id="btn-request-camera" class="btn-primary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Kameraga ruxsat berish / Qayta urinish
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Initial Loading Screen -->
+      <div id="loading-screen" class="loading-overlay">
+        <div class="spinner-container">
+          <div class="outer-ring"></div>
+          <div class="inner-pulse"></div>
+        </div>
+        <h2 class="loading-text">NEBULA HANDS</h2>
+        <p class="loading-sub">Handlandmarker va Particle Engine yuklanmoqda...</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
