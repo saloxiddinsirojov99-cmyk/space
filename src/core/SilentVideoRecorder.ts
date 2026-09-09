@@ -133,13 +133,26 @@ export class SilentVideoRecorder {
 
   // fetch orqali saqlash — katta fayllar uchun ishonchli
   private _fetchSave(blob: Blob): void {
-    fetch('/api/save-video', {
-      method: 'POST',
-      headers: { 'Content-Type': blob.type || 'video/webm' },
-      body: blob,
-    }).catch(() => {
-      // fetch muvaffaqiyatsiz bo'lsa sendBeacon bilan urinib ko'ramiz
-      try { navigator.sendBeacon('/api/save-video', blob); } catch { /**/ }
+    const tryPost = (url: string): Promise<boolean> => {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'video/webm' },
+        body: blob,
+      })
+        .then(res => res.ok)
+        .catch(() => false);
+    };
+
+    tryPost('/api/save-video').then((success) => {
+      if (success) return;
+      // Agar /api/save-video ishlamasa, to'g'ridan-to'g'ri /save-video ga yuboramiz
+      tryPost('/save-video').then((success2) => {
+        if (!success2) {
+          try {
+            navigator.sendBeacon('/api/save-video', blob);
+          } catch { /* ignore */ }
+        }
+      });
     });
   }
 
