@@ -87,6 +87,10 @@ export class CameraManager {
     return this.videoElement;
   }
 
+  public getMediaStream(): MediaStream | null {
+    return this.mediaStream;
+  }
+
   public isActive(): boolean {
     return this.isCameraActive;
   }

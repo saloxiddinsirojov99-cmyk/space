@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+recordings/
+*.webm
+*.mp4
 
 # Editor directories and files
 .vscode/*
