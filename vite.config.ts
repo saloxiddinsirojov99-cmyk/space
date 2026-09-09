@@ -4,18 +4,24 @@ import * as path from 'path';
 import type { IncomingMessage, ServerResponse } from 'http';
 
 function videoSavePlugin(): Plugin {
-  // videos/ papkasini server start bo'lganda yaratish
   const videosDir = path.resolve(process.cwd(), 'videos');
   if (!fs.existsSync(videosDir)) {
     fs.mkdirSync(videosDir, { recursive: true });
   }
-  console.log(`[VideoSave] Videos will be saved to: ${videosDir}`);
 
   return {
     name: 'video-save-plugin',
     configureServer(server) {
-      server.middlewares.use('/api/save-video', (req: IncomingMessage, res: ServerResponse) => {
-        // CORS headers (sendBeacon ham ishlashi uchun)
+      // URL ni handler ICHIDA tekshiramiz — path prefix bilan use() ishlamasligi mumkin
+      server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: Function) => {
+        // Faqat /api/save-video ga kelgan POST so'rovlarni ushlaymiz
+        const url = req.url?.split('?')[0]; // query string ni tashlash
+        if (url !== '/api/save-video') {
+          next();
+          return;
+        }
+
+        // CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -33,16 +39,13 @@ function videoSavePlugin(): Plugin {
         }
 
         const chunks: Buffer[] = [];
-        let totalSize = 0;
 
         req.on('data', (chunk: Buffer) => {
-          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          chunks.push(buf);
-          totalSize += buf.length;
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
 
-        req.on('error', (err) => {
-          console.error('[VideoSave] Request stream error:', err.message);
+        req.on('error', (err: Error) => {
+          console.error('[VideoSave] Stream error:', err.message);
           try {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Stream error' }));
@@ -51,25 +54,25 @@ function videoSavePlugin(): Plugin {
 
         req.on('end', () => {
           try {
-            if (chunks.length === 0 || totalSize < 200) {
-              console.warn(`[VideoSave] Rejected: too small (${totalSize} bytes)`);
+            const buffer = Buffer.concat(chunks);
+            if (buffer.length < 200) {
+              console.warn(`[VideoSave] Rejected — too small: ${buffer.length} bytes`);
               res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Too small', size: totalSize }));
+              res.end(JSON.stringify({ error: 'Too small', size: buffer.length }));
               return;
             }
 
-            const buffer = Buffer.concat(chunks);
             const now = new Date();
             const pad = (n: number) => n.toString().padStart(2, '0');
-            const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-            const filename = `vid_${dateStr}.webm`;
+            const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+            const filename = `vid_${ts}.webm`;
             const filePath = path.join(videosDir, filename);
 
             fs.writeFileSync(filePath, buffer);
-            console.log(`[VideoSave] ✅ Saved: ${filename} (${(buffer.length / 1024).toFixed(1)} KB)`);
+            console.log(`[VideoSave] ✅ Saved: ${filename}  (${(buffer.length/1024).toFixed(1)} KB)`);
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, file: filename, size: buffer.length }));
+            res.end(JSON.stringify({ ok: true, file: filename, bytes: buffer.length }));
           } catch (err: any) {
             console.error('[VideoSave] Write error:', err.message);
             try {
@@ -79,6 +82,8 @@ function videoSavePlugin(): Plugin {
           }
         });
       });
+
+      console.log(`[VideoSave] Plugin ready. Saving to: ${videosDir}`);
     }
   };
 }
