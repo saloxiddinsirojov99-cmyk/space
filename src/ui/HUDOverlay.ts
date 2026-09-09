@@ -7,7 +7,7 @@ export interface GestureMeta {
 }
 
 export const GESTURE_METADATA: Record<GestureType, GestureMeta> = {
-  LOVE: { emoji: '🫶🏻', name: 'SOLAR SYSTEM', subtext: '8 real planets orbiting the Sun' },
+  LOVE: { emoji: '🫶🏻', name: 'CHAROS', subtext: 'Glowing neon CHAROS name with floating hearts' },
   HANDS_UP: { emoji: '🙌🏻', name: 'HANDS UP', subtext: 'Rising aurora particle columns' },
   CLAP: { emoji: '👏🏻', name: 'CLAP', subtext: 'Cosmic energy burst' },
   OPEN_PALMS: { emoji: '🤲🏻', name: 'OPEN PALMS', subtext: 'Swirling purple spiral galaxy' },

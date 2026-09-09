@@ -18,6 +18,9 @@ export class EffectsManager {
   private targetHandCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private isHandPresent: boolean = false;
 
+  // Precomputed rasterized 2D points for CHAROS text formation
+  private charosPoints: { x: number; y: number }[] = [];
+
   constructor(particleSystem: ParticleSystem) {
     this.particleSystem = particleSystem;
     this.heartEffect = new HeartEffect();
@@ -25,6 +28,8 @@ export class EffectsManager {
     const maxParticles = 90000;
     this.desiredTargets = new Float32Array(maxParticles * 3);
     this.currentTargets = new Float32Array(maxParticles * 3);
+
+    this.initCharosTextPoints();
   }
 
   public update(deltaTime: number, gestureResult: GestureResult, hands: HandData[]): void {
@@ -67,9 +72,9 @@ export class EffectsManager {
 
     // Map hand gestures to distinct Formations
     switch (gestureResult.gesture) {
-      // ☀️ 1. BEAUTIFUL SOLAR SYSTEM TOP-DOWN VIEW (LOVE 🫶🏻)
+      // 💖 1. GLOWING NEON "CHAROS" NAME WITH FLOATING HEARTS (LOVE 🫶🏻)
       case 'LOVE':
-        this.generateBeautifulSolarSystem(this.desiredTargets, activeCount, p1World, p2World);
+        this.generateCharosEffect(this.desiredTargets, activeCount, p1World, p2World);
         break;
 
       // 🧬 2. DNA DOUBLE HELIX FORMATION (CROSSED FINGERS 🤞🏻)
@@ -145,7 +150,146 @@ export class EffectsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // ☀️ FORMATION 1: BEAUTIFUL SOLAR SYSTEM TOP-DOWN VIEW (LOVE 🫶🏻)
+  // 💖 FORMATION 1: GLOWING NEON "CHAROS" NAME WITH HEARTS (LOVE 🫶🏻)
+  // ---------------------------------------------------------------------------
+  private initCharosTextPoints(): void {
+    if (typeof document === 'undefined') return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 720;
+      canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 115px "Orbitron", "Outfit", "Arial", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('CHAROS', canvas.width / 2, canvas.height / 2);
+
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+      const step = 2; // high density
+      const pts: { x: number; y: number }[] = [];
+
+      const halfW = canvas.width / 2;
+      const halfH = canvas.height / 2;
+      // Scale to WebGL world units: width ~ 2.8
+      const scaleFactor = 2.8 / canvas.width;
+
+      for (let y = 0; y < canvas.height; y += step) {
+        for (let x = 0; x < canvas.width; x += step) {
+          const idx = (y * canvas.width + x) * 4;
+          if (data[idx] > 80) { // Text pixel
+            pts.push({
+              x: (x - halfW) * scaleFactor,
+              y: -(y - halfH) * scaleFactor
+            });
+          }
+        }
+      }
+
+      this.charosPoints = pts;
+    } catch (e) {
+      console.warn('Canvas rasterization error for CHAROS text:', e);
+    }
+  }
+
+  private generateCharosEffect(
+    buffer: Float32Array,
+    count: number,
+    p1: THREE.Vector3,
+    p2: THREE.Vector3 | null
+  ): void {
+    const center = p2 ? p1.clone().add(p2).multiplyScalar(0.5) : p1;
+
+    // Fallback if canvas rasterization didn't produce points
+    if (!this.charosPoints || this.charosPoints.length === 0) {
+      this.initCharosTextPoints();
+    }
+
+    const pts = this.charosPoints;
+    const numPts = pts.length;
+
+    // Budget:
+    // 65% particles for "CHAROS" text letters (thick, glowing neon typography)
+    // 25% particles for surrounding glowing heart outline
+    // 10% particles for orbiting sparkle stars & mini hearts
+    const textPool = Math.floor(count * 0.65);
+    const heartPool = Math.floor(count * 0.25);
+    const sparklesPool = count - textPool - heartPool;
+
+    let idx = 0;
+
+    // Subtle gentle pulse
+    const pulse = 1.0 + Math.sin(this.pulseTime * 3.0) * 0.035;
+
+    // 1. "CHAROS" Text Letters (Extremely crisp, dense, glowing)
+    if (numPts > 0) {
+      for (let i = 0; i < textPool; i++) {
+        const pt = pts[i % numPts];
+        const i3 = idx * 3;
+
+        // Slight 3D extrusion/jitter for neon glow volume
+        const jitter = (Math.random() - 0.5) * 0.012;
+        const depth = (Math.random() - 0.5) * 0.08;
+
+        buffer[i3]     = center.x + pt.x * pulse + jitter;
+        buffer[i3 + 1] = center.y + pt.y * pulse + jitter;
+        buffer[i3 + 2] = center.z + depth;
+        idx++;
+      }
+    } else {
+      // Fallback
+      for (let i = 0; i < textPool; i++) {
+        const i3 = idx * 3;
+        buffer[i3]     = center.x + (Math.random() - 0.5) * 2.0;
+        buffer[i3 + 1] = center.y + (Math.random() - 0.5) * 0.6;
+        buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.1;
+        idx++;
+      }
+    }
+
+    // 2. Surrounding Big Glowing Heart Outline framing the name
+    const heartScale = 0.145 * pulse;
+    for (let i = 0; i < heartPool; i++) {
+      const i3 = idx * 3;
+      const t = (i / heartPool) * Math.PI * 2.0;
+
+      // Parametric heart formula
+      const sinT = Math.sin(t);
+      const hx = 16 * sinT * sinT * sinT;
+      const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+
+      // Frame slightly wider horizontally to embrace the word
+      const fx = (hx / 16.0) * 2.1 * (heartScale / 0.145);
+      const fy = ((hy - 0.5) / 16.0) * 1.65 * (heartScale / 0.145);
+      const jitter = (Math.random() - 0.5) * 0.02;
+
+      buffer[i3]     = center.x + fx + jitter;
+      buffer[i3 + 1] = center.y + fy + jitter;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.04;
+      idx++;
+    }
+
+    // 3. Orbiting Sparkles & Floating Mini Hearts
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      const t = (idx / sparklesPool) * Math.PI * 6.0 + this.pulseTime * 0.8;
+      const r = 0.4 + (idx % 20) * 0.08;
+
+      buffer[i3]     = center.x + Math.cos(t) * r * 1.5;
+      buffer[i3 + 1] = center.y + Math.sin(t) * r * 0.9;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.2;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ☀️ FORMATION: BEAUTIFUL SOLAR SYSTEM TOP-DOWN VIEW
   // 8 real planets: Mercury, Venus, Earth, Mars, (Asteroid Belt),
   //                 Jupiter, Saturn (rings!), Uranus, Neptune
   // ---------------------------------------------------------------------------
