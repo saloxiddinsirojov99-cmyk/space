@@ -11,41 +11,45 @@ export class HandTracker {
   private lastVideoTime: number = -1;
   private cachedHands: HandData[] = [];
   private lastDetectionTime: number = 0;
-  private readonly gracePeriodMs: number = 800; // Grace period before dropping hands
-  private readonly smoothingAlpha: number = 0.35; // Landmark EMA smoothing factor
+  private readonly gracePeriodMs: number = 350; // Grace period before dropping hands (tezkor javob)
 
   public async initialize(): Promise<void> {
+    const options = {
+      baseOptions: {
+        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+        delegate: 'GPU' as const
+      },
+      runningMode: 'VIDEO' as const,
+      numHands: 2,
+      minHandDetectionConfidence: 0.6,
+      minHandPresenceConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    };
+
     try {
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
       );
 
-      this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-          delegate: 'GPU'
-        },
-        runningMode: 'VIDEO',
-        numHands: 2
-      });
-
+      this.handLandmarker = await HandLandmarker.createFromOptions(vision, options);
       this.isInitialized = true;
-      console.log('MediaPipe HandLandmarker initialized successfully.');
+      console.log('MediaPipe HandLandmarker initialized successfully (GPU).');
     } catch (err) {
       console.warn('GPU mode failed for MediaPipe, falling back to CPU:', err);
       try {
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
-        this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        const cpuOptions = {
+          ...options,
           baseOptions: {
-            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-            delegate: 'CPU'
-          },
-          runningMode: 'VIDEO',
-          numHands: 2
-        });
+            ...options.baseOptions,
+            delegate: 'CPU' as const
+          }
+        };
+        this.handLandmarker = await HandLandmarker.createFromOptions(vision, cpuOptions);
         this.isInitialized = true;
+        console.log('MediaPipe HandLandmarker initialized successfully (CPU).');
       } catch (cpuErr) {
         console.error('Failed to initialize HandLandmarker:', cpuErr);
         throw cpuErr;
@@ -70,14 +74,21 @@ export class HandTracker {
           const handednessCategory = results.handednesses[i]?.[0]?.categoryName || 'Right';
           const prevHand = this.cachedHands[i];
 
-          // Apply Exponential Moving Average (EMA) smoothing to eliminate micro-jitter
+          // Adaptiv EMA smoothing: qo'l tez harakatlansa alpha katta (kechikish yo'q),
+          // sekin turganda alpha kichik (jitter yo'qoladi)
+          let deltaDist = 0;
+          if (prevHand && prevHand.landmarks[0]) {
+            deltaDist = Math.hypot(rawLandmarks[0].x - prevHand.landmarks[0].x, rawLandmarks[0].y - prevHand.landmarks[0].y);
+          }
+          const dynamicAlpha = Math.min(0.85, Math.max(0.48, deltaDist * 10.0));
+
           const smoothedLandmarks: NormalizedLandmark[] = rawLandmarks.map((lm, idx) => {
             if (prevHand && prevHand.landmarks[idx]) {
               const prev = prevHand.landmarks[idx];
               return {
-                x: prev.x + (lm.x - prev.x) * this.smoothingAlpha,
-                y: prev.y + (lm.y - prev.y) * this.smoothingAlpha,
-                z: prev.z + (lm.z - prev.z) * this.smoothingAlpha,
+                x: prev.x + (lm.x - prev.x) * dynamicAlpha,
+                y: prev.y + (lm.y - prev.y) * dynamicAlpha,
+                z: prev.z + (lm.z - prev.z) * dynamicAlpha,
                 visibility: lm.visibility
               };
             }

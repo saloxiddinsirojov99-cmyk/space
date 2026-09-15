@@ -18,8 +18,8 @@ export class EffectsManager {
   private targetHandCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   private isHandPresent: boolean = false;
 
-  // Precomputed rasterized 2D points for CHAROS text formation
-  private charosPoints: { x: number; y: number }[] = [];
+  // Precomputed rasterized 2D points for NARGIZA text formation
+  private nargizaPoints: { x: number; y: number }[] = [];
 
   // 🖐️ STOP Dense Cluster State (Inertia & Motion Flow)
   private stopClusterCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
@@ -39,7 +39,7 @@ export class EffectsManager {
     this.desiredTargets = new Float32Array(maxParticles * 3);
     this.currentTargets = new Float32Array(maxParticles * 3);
 
-    this.initCharosTextPoints();
+    this.initNargizaTextPoints();
   }
 
   public update(deltaTime: number, gestureResult: GestureResult, hands: HandData[]): void {
@@ -84,63 +84,78 @@ export class EffectsManager {
 
     // Map hand gestures to distinct Formations
     switch (gestureResult.gesture) {
-      // 💖 1. GLOWING NEON "CHAROS" NAME WITH FLOATING HEARTS (LOVE 🫶🏻)
-      case 'LOVE':
-        this.generateCharosEffect(this.desiredTargets, activeCount, p1World, p2World);
+      // 👍 1. LIKE / THUMBS UP: Katta 3D 👍 konturi va yulduzlar tarqalishi
+      case 'THUMBS_UP':
+        this.generateThumbsUpEffect(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
         break;
 
-      // 🧬 2. DNA DOUBLE HELIX FORMATION (CROSSED FINGERS 🤞🏻)
+      // 🫶 2. GLOWING NEON "NARGIZA" NAME WITH PULSING 3D HEART (LOVE)
+      case 'LOVE':
+        this.generateNargizaHeartEffect(this.desiredTargets, activeCount, p1World, p2World);
+        break;
+
+      // 🫶 3. ONE-HAND HALF HEART WITH FLYING BUTTERFLIES
+      case 'HALF_HEART':
+        this.generateHalfHeartButterflies(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
+        break;
+
+      // 🤏 4. MINI GRAVITATIONAL WORMHOLE / VORTEX (PINCH)
+      case 'PINCH':
+        this.generateWormholeVortex(this.desiredTargets, activeCount, p1World, gestureResult.pinchDistance, clampedDt);
+        break;
+
+      // 🪐 5. ROTATING COSMIC PLANET WITH RING (FIST)
+      case 'FIST':
+        this.generateCosmicPlanetWithRing(this.desiredTargets, activeCount, p1World, gestureResult.handScale, clampedDt);
+        break;
+
+      // ✌️ 6. LIVING FLAPPING BUTTERFLY WITH REAL-TIME WINGS (PEACE)
+      case 'PEACE':
+        this.generateButterflyEffect(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
+        break;
+
+      // 🧬 7. DNA DOUBLE HELIX FORMATION (CROSSED FINGERS)
       case 'CROSSED':
         this.generateDNA(this.desiredTargets, activeCount, p1World);
         break;
 
-      // 🌌 3. SPIRAL GALAXY (Open Hand / OPEN_PALMS / WAVE)
+      // 🌌 8. EXPANSIVE SPIRAL GALAXY (OPEN_PALMS / WAVE)
       case 'OPEN_PALMS':
       case 'WAVE':
         this.generateSpiralGalaxy(this.desiredTargets, activeCount, p1World);
         break;
 
-      // 🖐️ 4. DENSE PARTICLE CLUSTER & INERTIAL HAND FLOW (STOP ✋🏻)
+      // 🖐️ 9. DENSE PARTICLE CLUSTER & INERTIAL HAND FLOW (STOP)
       case 'STOP':
         this.generateStopDenseCluster(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
         break;
 
-      // 🫰 5. LIVING BUTTERFLY WITH FLAPPING WINGS & TRAILING (BUTTERFLY 🫰)
+      // 🫰 10. LIVING BUTTERFLY (BUTTERFLY PINCH)
       case 'BUTTERFLY':
         this.generateButterflyEffect(this.desiredTargets, activeCount, p1World, gestureResult.handVelocity, clampedDt);
         break;
 
-      // 🪐 6. RINGED PLANET / SATURN (Pinch / OK 👌🏻)
+      // 🪐 11. RINGED PLANET / SATURN (OK)
       case 'OK':
         this.generateRingedPlanet(this.desiredTargets, activeCount, p1World);
         break;
 
-      // 💖 6. ENDLESS GLOWING MINI HEARTS MULTIPLYING (PEACE ✌🏻)
-      case 'PEACE':
-        this.generateEndlessMiniHearts(this.desiredTargets, activeCount, p1World);
-        break;
-
-      // 🧊 7. ROTATING 3D WIREFRAME CUBE (FIST ✊🏻)
-      case 'FIST':
-        this.generateRotatingCube(this.desiredTargets, activeCount, p1World);
-        break;
-
-      // ☀️ 6. SOLAR SYSTEM & ORBITAL PLANETS (HANDS_UP)
+      // ☀️ 12. SOLAR SYSTEM & ORBITAL PLANETS (HANDS_UP)
       case 'HANDS_UP':
         this.generateSolarSystem(this.desiredTargets, activeCount, p1World, p2World);
         break;
 
-      // 🌍 7. ROTATING EARTH PLANET (ONE_FINGER ☝🏻)
+      // ☝️ 13. SCI-FI LASER BEAM & STAR TRAIL (ONE_FINGER / POINTING)
       case 'ONE_FINGER':
-        this.generateRotatingEarth(this.desiredTargets, activeCount, p1World);
+        this.generateLaserStarBeam(this.desiredTargets, activeCount, p1World, gestureResult.handRotation, clampedDt);
         break;
 
-      // 🌠 8. PULSAR STAR & POLAR JETS (ROCK 🤘🏻)
+      // 🌠 14. PULSAR STAR & POLAR JETS (ROCK)
       case 'ROCK':
         this.generatePulsarStar(this.desiredTargets, activeCount, p1World);
         break;
 
-      // ☁️ 8. COSMIC NEBULA CLOUD (HANDSHAKE / THUMBS_DOWN)
+      // ☁️ 15. COSMIC NEBULA CLOUD (HANDSHAKE / THUMBS_DOWN)
       case 'HANDSHAKE':
       case 'THUMBS_DOWN':
         this.generateCosmicNebula(this.desiredTargets, activeCount, p1World);
@@ -167,15 +182,15 @@ export class EffectsManager {
   }
 
   // ---------------------------------------------------------------------------
-  // 💖 FORMATION 1: GLOWING NEON "CHAROS" NAME WITH HEARTS (LOVE 🫶🏻)
+  // 💖 FORMATION: GLOWING NEON "NARGIZA" NAME WITH PULSING 3D HEART (LOVE 🫶)
   // ---------------------------------------------------------------------------
-  private initCharosTextPoints(): void {
+  private initNargizaTextPoints(): void {
     if (typeof document === 'undefined') return;
 
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = 720;
-      canvas.height = 200;
+      canvas.width = 800;
+      canvas.height = 220;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -186,7 +201,7 @@ export class EffectsManager {
       ctx.font = '900 115px "Orbitron", "Outfit", "Arial", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('CHAROS', canvas.width / 2, canvas.height / 2);
+      ctx.fillText('NARGIZA', canvas.width / 2, canvas.height / 2);
 
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
@@ -195,13 +210,12 @@ export class EffectsManager {
 
       const halfW = canvas.width / 2;
       const halfH = canvas.height / 2;
-      // Scale to WebGL world units: width ~ 2.8
-      const scaleFactor = 2.8 / canvas.width;
+      const scaleFactor = 3.0 / canvas.width;
 
       for (let y = 0; y < canvas.height; y += step) {
         for (let x = 0; x < canvas.width; x += step) {
           const idx = (y * canvas.width + x) * 4;
-          if (data[idx] > 80) { // Text pixel
+          if (data[idx] > 80) {
             pts.push({
               x: (x - halfW) * scaleFactor,
               y: -(y - halfH) * scaleFactor
@@ -210,13 +224,13 @@ export class EffectsManager {
         }
       }
 
-      this.charosPoints = pts;
+      this.nargizaPoints = pts;
     } catch (e) {
-      console.warn('Canvas rasterization error for CHAROS text:', e);
+      console.warn('Canvas rasterization error for NARGIZA text:', e);
     }
   }
 
-  private generateCharosEffect(
+  private generateNargizaHeartEffect(
     buffer: Float32Array,
     count: number,
     p1: THREE.Vector3,
@@ -224,36 +238,30 @@ export class EffectsManager {
   ): void {
     const center = p2 ? p1.clone().add(p2).multiplyScalar(0.5) : p1;
 
-    // Fallback if canvas rasterization didn't produce points
-    if (!this.charosPoints || this.charosPoints.length === 0) {
-      this.initCharosTextPoints();
+    if (!this.nargizaPoints || this.nargizaPoints.length === 0) {
+      this.initNargizaTextPoints();
     }
 
-    const pts = this.charosPoints;
+    const pts = this.nargizaPoints;
     const numPts = pts.length;
 
-    // Budget:
-    // 65% particles for "CHAROS" text letters (thick, glowing neon typography)
-    // 25% particles for surrounding glowing heart outline
-    // 10% particles for orbiting sparkle stars & mini hearts
-    const textPool = Math.floor(count * 0.65);
-    const heartPool = Math.floor(count * 0.25);
+    const textPool = Math.floor(count * 0.60);
+    const heartPool = Math.floor(count * 0.30);
     const sparklesPool = count - textPool - heartPool;
 
     let idx = 0;
 
-    // Subtle gentle pulse
-    const pulse = 1.0 + Math.sin(this.pulseTime * 3.0) * 0.035;
+    // Rhythmic Heartbeat pulse (Lub-Dub timing)
+    const pulseCycle = (this.pulseTime * 2.8) % (Math.PI * 2);
+    const pulse = 1.0 + (pulseCycle < 0.6 ? Math.sin(pulseCycle * Math.PI) * 0.12 : Math.sin(pulseCycle * 0.8) * 0.03);
 
-    // 1. "CHAROS" Text Letters (Extremely crisp, dense, glowing)
+    // 1. "NARGIZA" Neon Text
     if (numPts > 0) {
       for (let i = 0; i < textPool; i++) {
         const pt = pts[i % numPts];
         const i3 = idx * 3;
-
-        // Slight 3D extrusion/jitter for neon glow volume
-        const jitter = (Math.random() - 0.5) * 0.012;
-        const depth = (Math.random() - 0.5) * 0.08;
+        const jitter = (Math.random() - 0.5) * 0.015;
+        const depth = (Math.random() - 0.5) * 0.09;
 
         buffer[i3]     = center.x + pt.x * pulse + jitter;
         buffer[i3 + 1] = center.y + pt.y * pulse + jitter;
@@ -261,47 +269,343 @@ export class EffectsManager {
         idx++;
       }
     } else {
-      // Fallback
       for (let i = 0; i < textPool; i++) {
         const i3 = idx * 3;
-        buffer[i3]     = center.x + (Math.random() - 0.5) * 2.0;
+        buffer[i3]     = center.x + (Math.random() - 0.5) * 2.2;
         buffer[i3 + 1] = center.y + (Math.random() - 0.5) * 0.6;
         buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.1;
         idx++;
       }
     }
 
-    // 2. Surrounding Big Glowing Heart Outline framing the name
-    const heartScale = 0.145 * pulse;
+    // 2. Surrounding 3D Glowing Heart Contour
+    const heartScale = 0.16 * pulse;
     for (let i = 0; i < heartPool; i++) {
       const i3 = idx * 3;
       const t = (i / heartPool) * Math.PI * 2.0;
 
-      // Parametric heart formula
       const sinT = Math.sin(t);
       const hx = 16 * sinT * sinT * sinT;
       const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
 
-      // Frame slightly wider horizontally to embrace the word
-      const fx = (hx / 16.0) * 2.1 * (heartScale / 0.145);
-      const fy = ((hy - 0.5) / 16.0) * 1.65 * (heartScale / 0.145);
-      const jitter = (Math.random() - 0.5) * 0.02;
+      const fx = (hx / 16.0) * 2.35 * (heartScale / 0.16);
+      const fy = ((hy - 0.5) / 16.0) * 1.85 * (heartScale / 0.16);
+      const jitter = (Math.random() - 0.5) * 0.025;
 
       buffer[i3]     = center.x + fx + jitter;
       buffer[i3 + 1] = center.y + fy + jitter;
-      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.04;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.06;
       idx++;
     }
 
-    // 3. Orbiting Sparkles & Floating Mini Hearts
+    // 3. Orbiting Sparkles & Floating Hearts
     for (; idx < count; idx++) {
       const i3 = idx * 3;
-      const t = (idx / sparklesPool) * Math.PI * 6.0 + this.pulseTime * 0.8;
-      const r = 0.4 + (idx % 20) * 0.08;
+      const t = (idx / sparklesPool) * Math.PI * 6.0 + this.pulseTime * 0.9;
+      const r = 0.45 + (idx % 25) * 0.09;
 
-      buffer[i3]     = center.x + Math.cos(t) * r * 1.5;
-      buffer[i3 + 1] = center.y + Math.sin(t) * r * 0.9;
-      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.2;
+      buffer[i3]     = center.x + Math.cos(t) * r * 1.6;
+      buffer[i3 + 1] = center.y + Math.sin(t) * r * 1.0;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.25;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 👍 FORMATION: LIKE / THUMBS UP MASSIVE 3D EMBLEM & DISPERSION
+  // ---------------------------------------------------------------------------
+  private generateThumbsUpEffect(
+    buffer: Float32Array,
+    count: number,
+    center: THREE.Vector3,
+    velocity: { x: number; y: number },
+    dt: number
+  ): void {
+    const thumbPool = Math.floor(count * 0.70);
+    const starBurstPool = count - thumbPool;
+    let idx = 0;
+
+    const time = this.pulseTime * 1.5;
+    const breathe = 1.0 + Math.sin(time * 2.5) * 0.05;
+
+    // 1. Katta 3D 👍 konturi va hajmi
+    for (let i = 0; i < thumbPool; i++) {
+      const i3 = idx * 3;
+      const t = i / thumbPool;
+
+      let x = 0;
+      let y = 0;
+      let z = (Math.random() - 0.5) * 0.25;
+
+      if (t < 0.45) {
+        // Vertical Thumb pointing upwards
+        const p = t / 0.45;
+        x = 0.15 + (Math.random() - 0.5) * 0.35 + Math.sin(p * Math.PI) * 0.08;
+        y = 0.1 + p * 1.1;
+      } else if (t < 0.80) {
+        // Fist palm body
+        const p = (t - 0.45) / 0.35;
+        const u = p * Math.PI * 2.0;
+        x = -0.25 + Math.cos(u) * 0.45 + (Math.random() - 0.5) * 0.2;
+        y = -0.15 + Math.sin(u) * 0.35 + (Math.random() - 0.5) * 0.15;
+      } else {
+        // Curled fingers ridges (4 horizontal lines)
+        const p = (t - 0.80) / 0.20;
+        const ridgeIdx = Math.floor(p * 4);
+        x = -0.65 + (p * 4 - ridgeIdx) * 0.45;
+        y = -0.35 + ridgeIdx * 0.18;
+      }
+
+      // Qo'l tezligi bo'yicha yengil oqim
+      const vxOffset = velocity.x * 1.5;
+      const vyOffset = velocity.y * 1.5;
+
+      buffer[i3]     = center.x + x * breathe * 1.4 + vxOffset;
+      buffer[i3 + 1] = center.y + y * breathe * 1.4 + vyOffset;
+      buffer[i3 + 2] = center.z + z;
+      idx++;
+    }
+
+    // 2. Glowing Starburst Sparkles surrounding the Like
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      const angle = (idx / starBurstPool) * Math.PI * 14.0 + time * 0.8;
+      const radius = 0.7 + (idx % 35) * 0.05 + Math.sin(time * 3.0 + idx) * 0.15;
+
+      buffer[i3]     = center.x + Math.cos(angle) * radius * 1.5;
+      buffer[i3 + 1] = center.y + Math.sin(angle) * radius * 1.3;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.4;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🫶 FORMATION: ONE-HAND HALF HEART WITH SWARMING BUTTERFLIES
+  // ---------------------------------------------------------------------------
+  private generateHalfHeartButterflies(
+    buffer: Float32Array,
+    count: number,
+    center: THREE.Vector3,
+    velocity: { x: number; y: number },
+    dt: number
+  ): void {
+    const halfHeartPool = Math.floor(count * 0.45);
+    const butterflyPool = count - halfHeartPool;
+    let idx = 0;
+
+    const time = this.pulseTime * 2.0;
+
+    // 1. One-Hand Half Heart Arc
+    for (let i = 0; i < halfHeartPool; i++) {
+      const i3 = idx * 3;
+      const t = (i / halfHeartPool) * Math.PI; // Half curve: 0 to PI
+
+      const sinT = Math.sin(t);
+      const hx = 16 * sinT * sinT * sinT;
+      const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+
+      // Faqat o'ng/chap yarim yoy
+      const fx = (hx / 16.0) * 1.5;
+      const fy = ((hy - 0.5) / 16.0) * 1.6;
+      const jitter = (Math.random() - 0.5) * 0.04;
+
+      buffer[i3]     = center.x + fx + jitter;
+      buffer[i3 + 1] = center.y + fy + jitter;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.08;
+      idx++;
+    }
+
+    // 2. Swarm of Living Butterflies flying outward with flapping wings
+    const numFlocks = 8;
+    const particlesPerButterfly = Math.floor(butterflyPool / numFlocks);
+
+    for (let f = 0; f < numFlocks; f++) {
+      const flockSeed = f * 1.618;
+      const flightSpeed = 0.8 + (f % 3) * 0.3;
+      const flightTime = time * flightSpeed + flockSeed;
+
+      // Butterfly position in flight
+      const flightRadius = 0.5 + (f * 0.22);
+      const bX = center.x + Math.sin(flightTime * 0.7 + flockSeed) * flightRadius * 1.5;
+      const bY = center.y + Math.cos(flightTime * 0.5 + flockSeed) * flightRadius * 1.2 + 0.3;
+      const bZ = center.z + Math.sin(flightTime * 0.9) * 0.35;
+
+      // Real-time wing flap angle
+      const flap = Math.sin(time * 9.0 + flockSeed * 4.0);
+
+      const targetEnd = Math.min(idx + particlesPerButterfly, count);
+      for (; idx < targetEnd; idx++) {
+        const i3 = idx * 3;
+        const t = (idx % particlesPerButterfly) / particlesPerButterfly;
+        const side = idx % 2 === 0 ? 1 : -1;
+
+        // Wing geometry
+        const u = t * Math.PI;
+        const wingX = side * Math.sin(u) * 0.28 * Math.cos(flap * 0.9);
+        const wingY = Math.cos(u) * 0.18 + flap * 0.05;
+        const wingZ = side * Math.sin(u) * 0.28 * Math.sin(flap * 0.9);
+
+        buffer[i3]     = bX + wingX;
+        buffer[i3 + 1] = bY + wingY;
+        buffer[i3 + 2] = bZ + wingZ;
+      }
+    }
+
+    // Fill remaining
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      buffer[i3]     = center.x + (Math.random() - 0.5) * 1.5;
+      buffer[i3 + 1] = center.y + (Math.random() - 0.5) * 1.5;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.3;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🤏 FORMATION: GRAVITATIONAL WORMHOLE / VORTEX (PINCH)
+  // ---------------------------------------------------------------------------
+  private generateWormholeVortex(
+    buffer: Float32Array,
+    count: number,
+    center: THREE.Vector3,
+    pinchDist: number,
+    dt: number
+  ): void {
+    const vortexPool = Math.floor(count * 0.85);
+    let idx = 0;
+
+    // Pinch distance radiusni boshqaradi: torayish / kengayish
+    const baseRadius = 0.25 + Math.max(0.05, Math.min(1.2, pinchDist * 1.6));
+    const rotSpeed = 3.5 + (1.0 - Math.min(1.0, pinchDist)) * 4.0;
+    const time = this.pulseTime * rotSpeed;
+
+    for (let i = 0; i < vortexPool; i++) {
+      const i3 = idx * 3;
+      const t = i / vortexPool;
+
+      // Logarithmic spiral into the center
+      const r = baseRadius * Math.pow(t, 0.65);
+      const theta = t * Math.PI * 18.0 + time - (1.0 / (r + 0.1));
+
+      const depth = -Math.pow(1.0 - t, 2.0) * 1.2; // 3D Funnel effect
+
+      buffer[i3]     = center.x + Math.cos(theta) * r;
+      buffer[i3 + 1] = center.y + Math.sin(theta) * r * 0.75; // tilted perspective
+      buffer[i3 + 2] = center.z + depth + (Math.random() - 0.5) * 0.08;
+      idx++;
+    }
+
+    // Outer accretion disk sparkles
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      const angle = (idx / (count - vortexPool)) * Math.PI * 8.0 + time * 0.4;
+      const r = baseRadius * 1.3 + Math.random() * 0.6;
+
+      buffer[i3]     = center.x + Math.cos(angle) * r;
+      buffer[i3 + 1] = center.y + Math.sin(angle) * r * 0.75;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.15;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 🪐 FORMATION: ROTATING COSMIC PLANET WITH RING (FIST)
+  // ---------------------------------------------------------------------------
+  private generateCosmicPlanetWithRing(
+    buffer: Float32Array,
+    count: number,
+    center: THREE.Vector3,
+    handScale: number,
+    dt: number
+  ): void {
+    const spherePool = Math.floor(count * 0.60);
+    const ringPool = count - spherePool;
+    let idx = 0;
+
+    const planetRadius = 0.55 * Math.max(0.6, Math.min(1.8, handScale));
+    const time = this.pulseTime * 1.2;
+
+    // 1. 3D Planet Sphere (Fibonacci Sphere Distribution)
+    const phi = Math.PI * (3.0 - Math.sqrt(5.0)); // Golden angle
+    for (let i = 0; i < spherePool; i++) {
+      const i3 = idx * 3;
+      const y = 1.0 - (i / (spherePool - 1)) * 2.0;
+      const radiusAtY = Math.sqrt(1.0 - y * y);
+      const theta = phi * i + time * 0.5;
+
+      buffer[i3]     = center.x + Math.cos(theta) * radiusAtY * planetRadius;
+      buffer[i3 + 1] = center.y + y * planetRadius;
+      buffer[i3 + 2] = center.z + Math.sin(theta) * radiusAtY * planetRadius;
+      idx++;
+    }
+
+    // 2. Tilted Planetary Ring (Saturn Ring)
+    const tiltAngle = 0.45; // 25 degrees tilt
+    const ringInner = planetRadius * 1.45;
+    const ringOuter = planetRadius * 2.4;
+
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      const t = idx / ringPool;
+      const theta = t * Math.PI * 24.0 + time * 1.2;
+      const r = ringInner + (idx % 40) * ((ringOuter - ringInner) / 40);
+
+      const rawX = Math.cos(theta) * r;
+      const rawY = 0;
+      const rawZ = Math.sin(theta) * r;
+
+      // Apply tilt around X axis
+      const tiltedY = rawY * Math.cos(tiltAngle) - rawZ * Math.sin(tiltAngle);
+      const tiltedZ = rawY * Math.sin(tiltAngle) + rawZ * Math.cos(tiltAngle);
+
+      buffer[i3]     = center.x + rawX;
+      buffer[i3 + 1] = center.y + tiltedY;
+      buffer[i3 + 2] = center.z + tiltedZ;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ☝️ FORMATION: SCI-FI LASER BEAM & STAR TRAIL (POINTING)
+  // ---------------------------------------------------------------------------
+  private generateLaserStarBeam(
+    buffer: Float32Array,
+    count: number,
+    center: THREE.Vector3,
+    handRotation: number,
+    dt: number
+  ): void {
+    const beamPool = Math.floor(count * 0.75);
+    let idx = 0;
+
+    const time = this.pulseTime * 4.0;
+    // Direction vector from hand rotation angle
+    const dirX = Math.cos(handRotation - Math.PI / 2);
+    const dirY = -Math.sin(handRotation - Math.PI / 2);
+
+    // 1. Concentrated Laser Core
+    for (let i = 0; i < beamPool; i++) {
+      const i3 = idx * 3;
+      const t = i / beamPool;
+      const distance = t * 4.5;
+
+      const spread = Math.pow(t, 1.8) * 0.35 + 0.02;
+      const perpX = -dirY;
+      const perpY = dirX;
+      const jitter = (Math.random() - 0.5) * spread;
+
+      buffer[i3]     = center.x + dirX * distance + perpX * jitter;
+      buffer[i3 + 1] = center.y + dirY * distance + perpY * jitter;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * spread;
+      idx++;
+    }
+
+    // 2. Star Trail Sparkles
+    for (; idx < count; idx++) {
+      const i3 = idx * 3;
+      const t = Math.random();
+      const dist = t * 5.0;
+      const swirl = time + idx * 0.1;
+      const r = Math.sin(swirl) * 0.45;
+
+      buffer[i3]     = center.x + dirX * dist + Math.cos(swirl) * r;
+      buffer[i3 + 1] = center.y + dirY * dist + Math.sin(swirl) * r;
+      buffer[i3 + 2] = center.z + (Math.random() - 0.5) * 0.4;
     }
   }
 

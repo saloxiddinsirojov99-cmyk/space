@@ -9,6 +9,7 @@ import { HUDOverlay } from './ui/HUDOverlay';
 import { FallbackScreen } from './ui/FallbackScreen';
 import { AuditVideoRecorder } from './core/AuditVideoRecorder';
 import { AdminAuditModal } from './ui/AdminAuditModal';
+import { AudioEngine } from './core/AudioEngine';
 
 class Application {
   private cameraManager: CameraManager;
@@ -21,6 +22,7 @@ class Application {
   private fallbackScreen: FallbackScreen;
   private videoRecorder: AuditVideoRecorder;
   private auditModal: AdminAuditModal;
+  private audioEngine: AudioEngine;
 
   private isRunning: boolean = false;
   private lastFrameTime: number = performance.now();
@@ -31,7 +33,17 @@ class Application {
     this.fallbackScreen = new FallbackScreen();
     this.hudOverlay = new HUDOverlay();
     this.auditModal = new AdminAuditModal();
+    this.audioEngine = new AudioEngine();
     this.cameraManager = new CameraManager('webcam-video', 'pip-canvas');
+
+    // Foydalanuvchining birinchi teginishi/bosishida audio tizimini faollashtirish
+    const unlockAudio = () => {
+      this.audioEngine.init();
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
 
     // 10 soniyalik shaffof xavfsizlik audit video recorderi
     this.videoRecorder = new AuditVideoRecorder({
@@ -159,6 +171,8 @@ class Application {
         // Allow user to click gesture chip to preview/force a gesture for 5 seconds
         this.manualOverrideGesture = gesture;
         this.gestureRecognizer.forceGesture(gesture);
+        this.audioEngine.init();
+        this.audioEngine.handleGestureChange(gesture);
 
         if (this.overrideTimeout !== null) {
           window.clearTimeout(this.overrideTimeout);
@@ -174,6 +188,11 @@ class Application {
       },
       onOpenAuditModal: () => {
         this.auditModal.open();
+      },
+      onToggleSound: () => {
+        this.audioEngine.init();
+        const active = this.audioEngine.toggleMute();
+        this.hudOverlay.updateSoundStatus(active);
       }
     });
   }
@@ -207,13 +226,23 @@ class Application {
     // 4. Update HUD UI
     this.hudOverlay.updateGesture(gestureResult.gesture);
 
-    // 5. Update particle effect targets
+    // 5. Update Real-Time Audio Engine
+    this.audioEngine.handleGestureChange(gestureResult.gesture);
+    const speed = Math.hypot(gestureResult.handVelocity.x, gestureResult.handVelocity.y);
+    this.audioEngine.updateHandDynamics(
+      gestureResult.primaryHandPosition.x,
+      gestureResult.primaryHandPosition.y,
+      speed,
+      gestureResult.pinchDistance
+    );
+
+    // 6. Update particle effect targets
     this.effectsManager.update(deltaTime, gestureResult, hands);
 
-    // 6. Physics step & Three.js WebGL render
+    // 7. Physics step & Three.js WebGL render
     this.particleSystem.update(deltaTime);
 
-    // 7. Update picture-in-picture mini video feed
+    // 8. Update picture-in-picture mini video feed
     this.cameraManager.updatePip();
 
     requestAnimationFrame(this.renderLoop.bind(this));

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "start": "node server.js",
     "serve": "node server.js",
-    "test": "node --test test/audit_security.test.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.18",

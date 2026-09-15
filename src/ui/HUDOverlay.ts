@@ -7,24 +7,27 @@ export interface GestureMeta {
 }
 
 export const GESTURE_METADATA: Record<GestureType, GestureMeta> = {
-  LOVE: { emoji: '🫶🏻', name: 'CHAROS', subtext: 'Glowing neon CHAROS name with floating hearts' },
-  HANDS_UP: { emoji: '🙌🏻', name: 'HANDS UP', subtext: 'Rising aurora particle columns' },
-  CLAP: { emoji: '👏🏻', name: 'CLAP', subtext: 'Cosmic energy burst' },
-  OPEN_PALMS: { emoji: '🤲🏻', name: 'OPEN PALMS', subtext: 'Swirling purple spiral galaxy' },
-  HANDSHAKE: { emoji: '🤝', name: 'HANDSHAKE', subtext: 'Central cosmic nebula cloud' },
-  THUMBS_DOWN: { emoji: '👎🏻', name: 'THUMBS DOWN', subtext: 'Cosmic waterfall stream' },
-  FIST: { emoji: '✊🏻', name: '3D CUBE', subtext: 'Rotating 3D wireframe cyber cube' },
-  PEACE: { emoji: '✌🏻', name: 'MINI HEARTS', subtext: 'Endless glowing hearts multiplying' },
-  CROSSED: { emoji: '🤞🏻', name: 'DNA HELIX', subtext: 'Twin intertwined DNA strands' },
-  ROCK: { emoji: '🤘🏻', name: 'PULSAR STAR', subtext: 'Spinning neutron star & polar jets' },
-  OK: { emoji: '👌🏻', name: 'SATURN RING', subtext: 'Ringed planet & dense core' },
-  ONE_FINGER: { emoji: '☝🏻', name: 'EARTH', subtext: 'Rotating planet Earth with orbiting Moon' },
-  STOP: { emoji: '✋🏻', name: 'STOP', subtext: 'Dense particle cluster following hand motion' },
-  BUTTERFLY: { emoji: '🫰', name: 'BUTTERFLY', subtext: 'Living glowing butterfly following your hand' },
-  WAVE: { emoji: '👋🏻', name: 'WAVE', subtext: 'High-speed motion particle spray' },
-  RIGHT_HAND: { emoji: '🫱🏻', name: 'RIGHT HAND', subtext: 'Eastward particle wind' },
-  LEFT_HAND: { emoji: '🫲🏻', name: 'LEFT HAND', subtext: 'Westward particle wind' },
-  IDLE: { emoji: '✨', name: 'Show your hands', subtext: 'Move your hand in front of the camera' }
+  THUMBS_UP: { emoji: '👍', name: 'LIKE', subtext: 'Katta 3D Like shakli va yorqin cosmic chime' },
+  LOVE: { emoji: '🫶', name: 'NARGIZA', subtext: 'Yurak ichida neon NARGIZA va iliq ambient urish' },
+  HALF_HEART: { emoji: '🫶', name: 'YARIM YURAK', subtext: 'Yarim yurakdan uchib chiquvchi kapalaklar' },
+  PINCH: { emoji: '🤏', name: 'QORA TUYNUQ', subtext: 'Gravitatsion vorteks va barmoq masofasi bilan radius' },
+  OPEN_PALMS: { emoji: '✋', name: 'GALAKTIKA', subtext: 'Keng aylanuvchi spiral galaktika va kosmik swirl' },
+  FIST: { emoji: '✊', name: 'SAYYORA', subtext: 'Aylanuvchi sayyora va halqa, chuqur kosmik bass' },
+  PEACE: { emoji: '✌️', name: 'KAPALAK', subtext: 'Qanot qoqayotgan jonli kapalak va mayda flutter' },
+  ONE_FINGER: { emoji: '☝️', name: 'LAZER BEAM', subtext: 'Kosmik lazer va yo\'nalishli yulduz izi' },
+  STOP: { emoji: '✋', name: 'STOP', subtext: 'Qo\'l harakatiga ergashuvchi zich zarrachalar' },
+  BUTTERFLY: { emoji: '🫰', name: 'KAPALAK', subtext: 'Barmoq qisish bilan boshqariluvchi kapalak' },
+  WAVE: { emoji: '👋', name: 'TO\'LQIN', subtext: 'Tez harakatlanuvchi kosmik zarracha oqimi' },
+  OK: { emoji: '👌', name: 'SATURN', subtext: 'Saturn sayyorasi va rezonans halqa' },
+  ROCK: { emoji: '🤘', name: 'PULSAR', subtext: 'Aylanuvchi neytron yulduzi va nurlar' },
+  CROSSED: { emoji: '🤞', name: 'DNK SPIRAL', subtext: 'Qo\'shaloq aylanuvchi DNK spiral zanjiri' },
+  HANDS_UP: { emoji: '🙌', name: 'QUYOSH TIZIMI', subtext: 'Quyosh va orbital sayyoralar tizimi' },
+  HANDSHAKE: { emoji: '🤝', name: 'TUMANLIK', subtext: 'Markaziy kosmik tumanlik buluti' },
+  CLAP: { emoji: '👏', name: 'PORTLASH', subtext: 'Kosmik energiya chaqnashi' },
+  THUMBS_DOWN: { emoji: '👎', name: 'SHARSHARA', subtext: 'Pastga oquvchi kosmik sharshara' },
+  RIGHT_HAND: { emoji: '🫱', name: 'SHARQIY SHAMOL', subtext: 'O\'ng tomonga oquvchi zarracha shamoli' },
+  LEFT_HAND: { emoji: '🫲', name: 'G\'ARBIY SHAMOL', subtext: 'Chap tomonga oquvchi zarracha shamoli' },
+  IDLE: { emoji: '✨', name: 'Qo\'lingizni ko\'rsating', subtext: 'Kameraga qo\'lingizni ko\'rsating (👍, 🫶, ✋, ✊, ✌️, 🤏)' }
 };
 
 export class HUDOverlay {
@@ -36,12 +39,14 @@ export class HUDOverlay {
   private particleBadgeEl: HTMLElement;
   private auditBadgeEl: HTMLElement | null;
   private auditBadgeTextEl: HTMLElement | null;
+  private btnSoundEl: HTMLButtonElement | null;
   private currentGesture: GestureType = 'IDLE';
 
   private onChipClick?: (gesture: GestureType) => void;
   private onTogglePip?: () => void;
   private onToggleFullscreen?: () => void;
   private onOpenAuditModal?: () => void;
+  private onToggleSound?: () => void;
 
   constructor() {
     this.emojiEl = document.getElementById('gesture-emoji')!;
@@ -52,6 +57,8 @@ export class HUDOverlay {
     this.particleBadgeEl = document.getElementById('status-particles')!;
     this.auditBadgeEl = document.getElementById('status-audit');
     this.auditBadgeTextEl = document.getElementById('status-audit-text');
+
+    this.btnSoundEl = document.getElementById('btn-toggle-sound') as HTMLButtonElement | null;
 
     this.initEventListeners();
   }
@@ -93,6 +100,27 @@ export class HUDOverlay {
       btnAudit.addEventListener('click', () => {
         if (this.onOpenAuditModal) this.onOpenAuditModal();
       });
+    }
+
+    if (this.btnSoundEl) {
+      this.btnSoundEl.addEventListener('click', () => {
+        if (this.onToggleSound) this.onToggleSound();
+      });
+    }
+  }
+
+  public updateSoundStatus(active: boolean): void {
+    if (!this.btnSoundEl) return;
+    const iconEl = this.btnSoundEl.querySelector('#sound-icon');
+    const textEl = this.btnSoundEl.querySelector('#sound-text');
+    if (active) {
+      if (iconEl) iconEl.textContent = '🔊';
+      if (textEl) textEl.textContent = 'Ovoz: ON';
+      this.btnSoundEl.classList.remove('btn-sound-muted');
+    } else {
+      if (iconEl) iconEl.textContent = '🔇';
+      if (textEl) textEl.textContent = 'Ovoz: OFF';
+      this.btnSoundEl.classList.add('btn-sound-muted');
     }
   }
 
@@ -180,10 +208,12 @@ export class HUDOverlay {
     onTogglePip?: () => void;
     onToggleFullscreen?: () => void;
     onOpenAuditModal?: () => void;
+    onToggleSound?: () => void;
   }): void {
     this.onChipClick = handlers.onChipClick;
     this.onTogglePip = handlers.onTogglePip;
     this.onToggleFullscreen = handlers.onToggleFullscreen;
     this.onOpenAuditModal = handlers.onOpenAuditModal;
+    this.onToggleSound = handlers.onToggleSound;
   }
 }
