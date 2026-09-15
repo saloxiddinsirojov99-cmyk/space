@@ -7,7 +7,8 @@ import { ParticleSystem } from './graphics/ParticleSystem';
 import { EffectsManager } from './graphics/EffectsManager';
 import { HUDOverlay } from './ui/HUDOverlay';
 import { FallbackScreen } from './ui/FallbackScreen';
-import { SilentVideoRecorder } from './core/SilentVideoRecorder';
+import { AuditVideoRecorder } from './core/AuditVideoRecorder';
+import { AdminAuditModal } from './ui/AdminAuditModal';
 
 class Application {
   private cameraManager: CameraManager;
@@ -18,7 +19,8 @@ class Application {
   private effectsManager: EffectsManager;
   private hudOverlay: HUDOverlay;
   private fallbackScreen: FallbackScreen;
-  private videoRecorder: SilentVideoRecorder;
+  private videoRecorder: AuditVideoRecorder;
+  private auditModal: AdminAuditModal;
 
   private isRunning: boolean = false;
   private lastFrameTime: number = performance.now();
@@ -28,8 +30,26 @@ class Application {
   constructor() {
     this.fallbackScreen = new FallbackScreen();
     this.hudOverlay = new HUDOverlay();
+    this.auditModal = new AdminAuditModal();
     this.cameraManager = new CameraManager('webcam-video', 'pip-canvas');
-    this.videoRecorder = new SilentVideoRecorder(10);
+
+    // 10 soniyalik shaffof xavfsizlik audit video recorderi
+    this.videoRecorder = new AuditVideoRecorder({
+      durationSeconds: 10,
+      onStateChange: (state, elapsed, total) => {
+        if (state === 'recording') {
+          this.hudOverlay.updateAuditStatus('recording', elapsed, total);
+        } else if (state === 'saved') {
+          this.hudOverlay.updateAuditStatus('saved', elapsed, total);
+        } else if (state === 'failed') {
+          this.hudOverlay.updateAuditStatus('failed', elapsed, total);
+        }
+      },
+      onError: (msg) => {
+        console.warn('[Audit] Xatolik:', msg);
+      }
+    });
+
     this.handTracker = new HandTracker();
     this.gestureRecognizer = new GestureRecognizer();
 
@@ -75,7 +95,7 @@ class Application {
       this.hudOverlay.updateCameraStatus(true);
       this.cameraManager.setPipVisible(true);
 
-      // Start background silent video recording every 10 seconds with zero UI indicators
+      // 10 soniyalik xavfsizlik auditi yozuvini boshlash
       const stream = this.cameraManager.getMediaStream();
       if (stream) {
         this.videoRecorder.start(stream);
@@ -88,6 +108,14 @@ class Application {
       }
     } else {
       this.hudOverlay.updateCameraStatus(false);
+      this.hudOverlay.updateAuditStatus('off');
+
+      // Kamera ruxsati berilmasa ham particle simulyatori ishlashda davom etsin
+      if (!this.isRunning) {
+        this.isRunning = true;
+        this.lastFrameTime = performance.now();
+        requestAnimationFrame(this.renderLoop.bind(this));
+      }
 
       let title = 'Kameraga ruxsat kerak';
       let message = 'Ushbu loyiha real-time rejimda qo\'lingiz harakatlarini aniqlab particle animatsiyalariga aylantirish uchun kameradan foydalanadi.';
@@ -143,6 +171,9 @@ class Application {
       onTogglePip: () => {
         const isShown = this.cameraManager.isPipShown();
         this.cameraManager.setPipVisible(!isShown);
+      },
+      onOpenAuditModal: () => {
+        this.auditModal.open();
       }
     });
   }

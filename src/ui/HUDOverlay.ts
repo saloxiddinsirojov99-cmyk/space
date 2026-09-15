@@ -34,11 +34,14 @@ export class HUDOverlay {
   private cameraBadgeEl: HTMLElement;
   private fpsBadgeEl: HTMLElement;
   private particleBadgeEl: HTMLElement;
+  private auditBadgeEl: HTMLElement | null;
+  private auditBadgeTextEl: HTMLElement | null;
   private currentGesture: GestureType = 'IDLE';
 
   private onChipClick?: (gesture: GestureType) => void;
   private onTogglePip?: () => void;
   private onToggleFullscreen?: () => void;
+  private onOpenAuditModal?: () => void;
 
   constructor() {
     this.emojiEl = document.getElementById('gesture-emoji')!;
@@ -47,6 +50,8 @@ export class HUDOverlay {
     this.cameraBadgeEl = document.getElementById('status-camera')!;
     this.fpsBadgeEl = document.getElementById('status-fps')!;
     this.particleBadgeEl = document.getElementById('status-particles')!;
+    this.auditBadgeEl = document.getElementById('status-audit');
+    this.auditBadgeTextEl = document.getElementById('status-audit-text');
 
     this.initEventListeners();
   }
@@ -82,6 +87,13 @@ export class HUDOverlay {
         }
       });
     }
+
+    const btnAudit = document.getElementById('btn-open-audit-modal');
+    if (btnAudit) {
+      btnAudit.addEventListener('click', () => {
+        if (this.onOpenAuditModal) this.onOpenAuditModal();
+      });
+    }
   }
 
   public updateGesture(gesture: GestureType): void {
@@ -112,6 +124,34 @@ export class HUDOverlay {
     this.particleBadgeEl.querySelector('.badge-text')!.textContent = `${(particleCount / 1000).toFixed(1)}k Pts`;
   }
 
+  public updateAuditStatus(status: 'recording' | 'saved' | 'failed' | 'off', elapsed: number = 0, total: number = 10): void {
+    if (!this.auditBadgeEl || !this.auditBadgeTextEl) return;
+
+    this.auditBadgeEl.classList.remove('hidden', 'badge-audit-saved', 'badge-audit-off');
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    if (status === 'recording') {
+      const current = Math.min(elapsed, total);
+      this.auditBadgeTextEl.textContent = `REC 00:${pad(current)} / 00:${pad(total)}`;
+    } else if (status === 'saved') {
+      this.auditBadgeEl.classList.add('badge-audit-saved');
+      this.auditBadgeTextEl.textContent = '✓ Audit saqlandi';
+      window.setTimeout(() => {
+        if (this.auditBadgeEl) this.auditBadgeEl.classList.add('hidden');
+      }, 5000);
+    } else if (status === 'off') {
+      this.auditBadgeEl.classList.add('badge-audit-off');
+      this.auditBadgeTextEl.textContent = 'Audit: Kamera o‘chiq';
+    } else if (status === 'failed') {
+      this.auditBadgeEl.classList.add('badge-audit-off');
+      this.auditBadgeTextEl.textContent = 'Audit: Yozilmadi';
+      window.setTimeout(() => {
+        if (this.auditBadgeEl) this.auditBadgeEl.classList.add('hidden');
+      }, 4000);
+    }
+  }
+
   private setActiveChip(gesture: GestureType): void {
     const chips = document.querySelectorAll('.gesture-chip');
     chips.forEach(chip => {
@@ -139,9 +179,11 @@ export class HUDOverlay {
     onChipClick?: (gesture: GestureType) => void;
     onTogglePip?: () => void;
     onToggleFullscreen?: () => void;
+    onOpenAuditModal?: () => void;
   }): void {
     this.onChipClick = handlers.onChipClick;
     this.onTogglePip = handlers.onTogglePip;
     this.onToggleFullscreen = handlers.onToggleFullscreen;
+    this.onOpenAuditModal = handlers.onOpenAuditModal;
   }
 }

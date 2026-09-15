@@ -34,6 +34,10 @@
             <h1>NEBULA<span>HANDS</span></h1>
           </div>
           <div class="status-badges">
+            <div id="status-audit" class="badge badge-audit hidden">
+              <span class="badge-dot-rec"></span>
+              <span class="badge-text" id="status-audit-text">REC 00:00 / 00:10</span>
+            </div>
             <div id="status-camera" class="badge badge-offline">
               <span class="badge-dot"></span>
               <span class="badge-text">Camera: OFF</span>
@@ -84,6 +88,10 @@
 
           <!-- Bottom Actions -->
           <div class="action-buttons">
+            <button id="btn-open-audit-modal" class="btn-action" title="Xavfsizlik Audit Paneli">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>Audit</span>
+            </button>
             <button id="btn-toggle-pip" class="btn-action" title="Kamera oynasini almashtirish">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               <span>Camera Feed</span>
@@ -93,6 +101,59 @@
             </button>
           </div>
         </footer>
+      </div>
+
+      <!-- Admin Audit Logs & Video Viewer Modal -->
+      <div id="admin-audit-modal" class="fallback-overlay hidden">
+        <div class="audit-modal-card">
+          <div class="audit-modal-header">
+            <div class="audit-modal-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <h2>Xavfsizlik Audit Paneli</h2>
+            </div>
+            <button id="btn-close-audit-modal" class="btn-icon-close" title="Yopish">✕</button>
+          </div>
+
+          <!-- Auth View -->
+          <div id="audit-auth-view" class="audit-modal-body">
+            <p class="audit-auth-desc">Audit jurnali va videolarni ko'rish uchun maxfiy Admin Tokenini kiriting:</p>
+            <div class="audit-token-input-row">
+              <input type="password" id="input-admin-token" placeholder="ADMIN_TOKEN..." autocomplete="off" />
+              <button id="btn-verify-admin-token" class="btn-primary">Kirish</button>
+            </div>
+            <p id="audit-auth-error" class="audit-error-text hidden"></p>
+          </div>
+
+          <!-- Log Content View -->
+          <div id="audit-data-view" class="audit-modal-body hidden">
+            <div class="audit-toolbar">
+              <span id="audit-total-count">Jami yozuvlar: 0</span>
+              <button id="btn-refresh-audit" class="btn-action-small">Yangilash 🔄</button>
+            </div>
+            <div class="audit-table-container">
+              <table class="audit-table">
+                <thead>
+                  <tr>
+                    <th>Vaqt</th>
+                    <th>IP Manzil</th>
+                    <th>Holat</th>
+                    <th>Hajm</th>
+                    <th>Video</th>
+                  </tr>
+                </thead>
+                <tbody id="audit-logs-tbody"></tbody>
+              </table>
+            </div>
+            <!-- Video Player Preview Container -->
+            <div id="audit-player-container" class="audit-player-box hidden">
+              <div class="audit-player-header">
+                <span id="audit-player-label">Video ijro</span>
+                <button id="btn-close-audit-player" class="btn-action-small">✕ Yopish</button>
+              </div>
+              <video id="audit-video-player" controls playsinline></video>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Fallback Modal Screen (Camera Request / Denied) -->
